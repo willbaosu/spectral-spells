@@ -34,7 +34,7 @@
     phase: 'loading', player: PLAYER_MAX, focus: { turns: 0, bonus: 0 },
     boss: null, level: 1, incoming: null, busy: false,
     wins: 0, casts: 0, bestRho: 0, bossR: null, playerR: null,
-    fightStarted: false
+    fightStarted: false, bossSink: 0, playerDown: false
   };
 
   // ---------- Audio ----------
@@ -126,11 +126,15 @@
   }
 
   function drawBoss(flash) {
-    state.bossR = Sprites.drawBoss($('bossArt'), { flash, bubble: state.boss && state.boss.barrier });
+    state.bossR = Sprites.drawBoss($('bossArt'), {
+      flash, sink: state.bossSink, bubble: state.boss && state.boss.barrier && !state.bossSink
+    });
   }
 
   function drawPlayer(flash) {
-    state.playerR = Sprites.drawPlayer($('playerArt'), { flash });
+    state.playerR = Sprites.drawPlayer($('playerArt'), {
+      flash, tint: state.playerDown ? 'rgba(20,16,40,0.6)' : null
+    });
   }
 
   // Convert a point on a sprite grid to the effects canvas
@@ -162,11 +166,19 @@
     FX.setAura(state.focus.turns > 0 ? pts.wand() : null);
   }
 
+  // Weighted random choice. A spell he just cast is less likely next
+  // time, and he never casts the same spell three times in a row.
   function chooseBossSpell() {
-    const b = state.boss, r = Math.random();
-    if (b.hp < 0.5 * b.maxHp && b.healsLeft > 0 && r < 0.35) return 'healing_rain';
-    if (!b.barrier && r < 0.2) return 'bubble_barrier';
-    return Math.random() < 0.55 ? 'water_jet' : 'tidal_wave';
+    const b = state.boss, last = state.bossLast || [];
+    const w = { water_jet: 3, tidal_wave: 3, bubble_barrier: b.barrier ? 0 : 1.5,
+      healing_rain: b.hp < 0.5 * b.maxHp && b.healsLeft > 0 ? 2 : 0 };
+    if (last[0] && w[last[0]]) w[last[0]] *= 0.4;
+    if (last[0] && last[0] === last[1]) w[last[0]] = 0;
+    const total = Object.values(w).reduce((p, q) => p + q, 0);
+    let r = Math.random() * total, id = 'water_jet';
+    for (const k in w) { if ((r -= w[k]) < 0) { id = k; break; } }
+    state.bossLast = [id, last[0]];
+    return id;
   }
 
   // ---------- UI ----------
@@ -228,7 +240,6 @@
     $('uploadLabel').classList.toggle('disabled', !canCast);
     $('takeHitBtn').classList.toggle('hidden', p !== 'react');
     $('takeHitBtn').disabled = busy;
-    $('againBtn').classList.toggle('hidden', p !== 'won' && p !== 'lost');
     $('trainBtn').disabled = busy || p !== 'attack';
   }
 
@@ -302,10 +313,12 @@
     if (b.hp <= 0) {
       state.wins++;
       state.phase = 'won';
-      FX.setTelegraph(null);
+      refreshControls();
       log(`${b.name} collapses into a puddle. You win!`, 'hit');
-      setStatus('You win! Fight again for a stronger Nerith.');
-      updateBars(); refreshControls();
+      setStatus('Nerith is defeated!');
+      await bossDeath();
+      updateBars();
+      showBanner('Victory!', `Nerith the Tidecaller is a puddle. Wins: ${state.wins}.`, true);
       return;
     }
     await wait(700);
@@ -364,9 +377,12 @@
     if (state.player <= 0) {
       state.phase = 'lost';
       state.focus = { turns: 0, bonus: 0 };
+      state.playerDown = true;
+      drawPlayer();
       updateBars();
-      setStatus('You were washed away. Try again?');
+      setStatus('You were washed away.');
       refreshControls();
+      showBanner('Defeated', 'Nerith washed you away.', false);
       return;
     }
     await wait(300);
@@ -390,50 +406,20 @@
 
   // ---------- Voice training ----------
 
-  // You say each spell once. Your recording is added as a fifth
-  // reference for that spell, so the game compares your voice with
-  // your own voice as well as the computer voices. It is saved in this
-  // browser, so training only has to be done once.
-  const TRAIN_KEY = 'spectralSpells.voice.v1';
-  const yours = id => state.refs[id].find(r => r.voice === 'you');
+  // At the start of each session you record each spell one to three
+  // times. Each take is added as an extra reference for that spell, so
+  // the game compares your voice with your own voice as well as the
+  // computer voices. Takes last until the page is closed or reloaded.
+  const MAX_TAKES = 3;
+  const yours = id => state.refs[id].filter(r => r.voice === 'you');
 
-  // Store the 16 kHz recording as 16-bit numbers in base64 text
-  function encode16(x) {
-    const b = new Uint8Array(2 * x.length), v = new DataView(b.buffer);
-    for (let i = 0; i < x.length; i++) v.setInt16(2 * i, Math.max(-1, Math.min(1, x[i])) * 32767, true);
-    let s = '';
-    for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
-    return btoa(s);
-  }
-
-  function decode16(text) {
-    const s = atob(text), b = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
-    const v = new DataView(b.buffer), x = new Float64Array(b.length / 2);
-    for (let i = 0; i < x.length; i++) x[i] = v.getInt16(2 * i, true) / 32768;
-    return x;
-  }
-
-  // x: your filtered recording at 16 kHz
+  // x: your filtered recording at 16 kHz. Past MAX_TAKES, the oldest
+  // take is replaced.
   function addYourRef(id, x) {
     const F = DSP.features(x, DSP.FS);
-    state.refs[id] = state.refs[id].filter(r => r.voice !== 'you');
+    const takes = yours(id);
+    if (takes.length >= MAX_TAKES) state.refs[id].splice(state.refs[id].indexOf(takes[0]), 1);
     state.refs[id].push({ voice: 'you', feat: F.feat, spec: F.spec, binHz: F.binHz, x });
-  }
-
-  function loadTraining() {
-    try {
-      const d = JSON.parse(localStorage.getItem(TRAIN_KEY) || '{}');
-      for (const id in d) if (state.refs[id]) addYourRef(id, decode16(d[id]));
-    } catch (e) { /* storage unavailable: train again */ }
-  }
-
-  function saveTraining() {
-    try {
-      const d = {};
-      SPELLS.forEach(s => { const r = yours(s.id); if (r) d[s.id] = encode16(r.x); });
-      localStorage.setItem(TRAIN_KEY, JSON.stringify(d));
-    } catch (e) { /* storage unavailable: kept for this visit only */ }
   }
 
   function buildTraining() {
@@ -456,11 +442,11 @@
   function updateTraining() {
     let n = 0;
     document.querySelectorAll('.train-row').forEach(row => {
-      const done = !!yours(row.dataset.id);
-      if (done) n++;
+      const k = yours(row.dataset.id).length;
+      if (k) n++;
       const st = row.querySelector('.t-status');
-      if (!row.dataset.msg) st.textContent = done ? '✓ Trained' : 'Not trained yet';
-      row.querySelector('.t-rec').textContent = done ? '● Record again' : '● Record';
+      if (!row.dataset.msg) st.textContent = k ? `✓ ${k} of ${MAX_TAKES} takes` : 'Not trained yet';
+      row.querySelector('.t-rec').textContent = k === 0 ? '● Record' : k < MAX_TAKES ? '● Add a take' : '● Replace oldest';
       row.querySelectorAll('button').forEach(b => (b.disabled = state.busy));
     });
     $('trainDoneBtn').disabled = state.busy;
@@ -482,8 +468,8 @@
         const computer = state.refs[id].filter(r => r.voice !== 'you').map(r => r.feat);
         const rho = DSP.scoreMulti(computer, proc.feat).rho;
         addYourRef(id, Float64Array.from(proc.filtered));
-        saveTraining();
-        st.textContent = `✓ Trained. Match with the computer voices: ρ = ${rho.toFixed(2)}`;
+        const k = yours(id).length;
+        st.textContent = `✓ Take ${k} of ${MAX_TAKES} saved. Match with the computer voices: ρ = ${rho.toFixed(2)}`;
       }
     } catch (err) {
       st.textContent = 'Microphone error: ' + err.message;
@@ -503,7 +489,7 @@
   function closeTraining() {
     $('training').classList.add('hidden');
     if (state.fightStarted) startAttackPhase();
-    else newFight(false);
+    else newFight('same');
   }
 
   // ---------- Charts ----------
@@ -519,8 +505,7 @@
       { x: Array.from(B.f, f => f / 1000), y: db(B.mag), color: '#9a90b8', label: 'raw (dashed)', dash: true }
     ], {
       xmin: 0, xmax: 8, ymin: -80, ymax: 0, xTicks: 8, yTicks: 4,
-      xFmt: v => v.toFixed(0), yFmt: v => v.toFixed(0),
-      title: 'Spectrum |F(s)| in dB: bandpass 80 Hz to 4 kHz', xlabel: 'frequency (kHz)',
+      title: 'Spectrum before and after the bandpass', xlabel: 'frequency (kHz)', ylabel: '|S(f)| (dB)',
       vbands: [{ from: DSP.F_LOW / 1000, to: DSP.F_HIGH / 1000, color: 'rgba(180,140,255,0.08)' }]
     });
 
@@ -533,23 +518,53 @@
       { x: [-span, span], y: [DSP.RHO_FULL, DSP.RHO_FULL], color: '#5fd18b', label: 'full power above this', dash: true, inline: true }
     ], {
       xmin: -span, xmax: span, ymin: -0.2, ymax: 1, xTicks: 6, yTicks: 6,
-      xFmt: v => v.toFixed(0), yFmt: v => (Math.abs(v) < 1e-9 ? 0 : v).toFixed(1),
-      title: 'Normalized correlation ρ vs time shift', xlabel: 'shift (ms)',
+      title: 'Correlation with the reference', xlabel: 'time shift (ms)', ylabel: 'ρ',
       marker: { x: best.lag * 10, y: best.rho, color: '#fff', label: 'peak ρ = ' + best.rho.toFixed(3) }
     });
 
     const frameSec = DSP.HOP / DSP.FS;
-    Charts.spectrogram($('chartCast'), proc.spec, proc.binHz, frameSec, 'Your voice: frequencies over time');
+    Charts.spectrogram($('chartCast'), proc.spec, proc.binHz, frameSec, 'Your cast');
     const ref = state.refs[s.id][sc.ref];
-    const who = ref.voice === 'you' ? 'your training recording' : `computer voice ${sc.ref + 1} of 4`;
-    Charts.spectrogram($('chartRef'), ref.spec, ref.binHz, frameSec,
-      `Best-matching reference: "${s.name}", ${who}`);
+    const who = ref.voice === 'you' ? 'your training take' : `computer voice ${sc.ref + 1}`;
+    Charts.spectrogram($('chartRef'), ref.spec, ref.binHz, frameSec, `Closest reference: ${who}`);
   }
 
   // ---------- Wire up ----------
 
-  function newFight(harder) {
-    if (harder) state.level++;
+  // Nerith sinks into a puddle with a splash
+  async function bossDeath() {
+    FX.setTelegraph(null);
+    FX.splash(pts.boss());
+    const t0 = performance.now(), dur = 1600;
+    await new Promise(res => {
+      function step(t) {
+        state.bossSink = Math.min(1, (t - t0) / dur);
+        drawBoss();
+        if (state.bossSink < 1) requestAnimationFrame(step); else res();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  // win = true shows Play again and Fight a stronger Nerith;
+  // win = false shows Try again
+  function showBanner(title, text, win) {
+    $('bannerTitle').textContent = title;
+    $('bannerText').textContent = text;
+    $('banner').classList.toggle('lost', !win);
+    $('harderBtn').classList.toggle('hidden', !win);
+    $('playAgainBtn').textContent = win ? 'Play again' : 'Try again';
+    $('banner').classList.remove('hidden');
+  }
+
+  // level: 'same', 'harder', or 'reset'
+  function newFight(level) {
+    if (level === 'harder') state.level++;
+    if (level === 'reset') state.level = 1;
+    $('banner').classList.add('hidden');
+    state.bossSink = 0;
+    state.playerDown = false;
+    state.bossLast = [];
     state.fightStarted = true;
     state.player = PLAYER_MAX;
     state.focus = { turns: 0, bonus: 0 };
@@ -600,7 +615,8 @@
     await landHit(0);
     setBusy(false);
   };
-  $('againBtn').onclick = () => newFight(state.phase === 'won');
+  $('playAgainBtn').onclick = () => newFight(state.phase === 'won' ? 'reset' : 'same');
+  $('harderBtn').onclick = () => newFight('harder');
   $('trainBtn').onclick = () => { if (!state.busy && state.phase === 'attack') openTraining(); };
   $('trainDoneBtn').onclick = () => { if (!state.busy) closeTraining(); };
 
@@ -616,12 +632,7 @@
   refreshControls();
   setStatus('Loading spells…');
   loadSpells()
-    .then(() => {
-      loadTraining();
-      // Ask for training until every spell has your recording
-      if (SPELLS.every(s => yours(s.id))) newFight(false);
-      else openTraining();
-    })
+    .then(() => openTraining())
     .catch(err => setStatus('Error loading spells: ' + err.message + '. Open the page through a web server, not as a file.'));
 
   // Exposed for automated testing

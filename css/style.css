@@ -99,6 +99,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .log .miss { color: var(--warn); }
 .log .hurt { color: var(--bad); }
 
+/* Victory and defeat banner */
+.banner {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 3;
+  background: rgba(18, 15, 28, 0.92); border: 2px solid var(--good); border-radius: 14px;
+  padding: 18px 26px; text-align: center; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: pop 0.35s ease-out;
+}
+.banner.lost { border-color: var(--bad); }
+.banner-title { font-size: 30px; font-weight: 800; color: var(--good); }
+.banner.lost .banner-title { color: var(--bad); }
+.banner-text { color: var(--muted); margin: 4px 0 12px; }
+.banner .cast-row { justify-content: center; }
+@keyframes pop { from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; } }
+
 /* Voice training */
 .train-list { display: grid; gap: 8px; margin: 12px 0; }
 .train-row {
@@ -110,7 +124,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Analysis */
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.chart { width: 100%; height: 210px; background: var(--panel2); border-radius: 8px; }
+.chart { width: 100%; height: 250px; background: var(--panel2); border-radius: 8px; }
 
 footer { padding-bottom: 24px; }
 code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }

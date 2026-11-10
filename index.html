@@ -15,13 +15,21 @@
   <main>
     <section id="training" class="training hidden">
       <h2>Voice training</h2>
-      <p class="muted small">Say each spell once so the game learns your voice. Each recording is added to that spell's computer-voice references and saved in this browser, so you only do this once. You can retrain any spell later with the Voice training button.</p>
+      <p class="muted small">Record each spell so the game learns your voice. One take per spell is enough to start. Two or three takes help, especially for short words like Focus. Your takes are added to each spell's computer-voice references for this session. You can add or replace takes during the fight with the Voice training button.</p>
       <div id="trainList" class="train-list"></div>
       <div class="cast-row"><button id="trainDoneBtn" class="primary">Start the fight</button></div>
     </section>
 
     <section class="battle">
       <canvas id="fx" class="fx" aria-hidden="true"></canvas>
+      <div id="banner" class="banner hidden">
+        <div id="bannerTitle" class="banner-title"></div>
+        <div id="bannerText" class="banner-text"></div>
+        <div class="cast-row">
+          <button id="playAgainBtn" class="primary">Play again</button>
+          <button id="harderBtn" class="secondary">Fight a stronger Nerith</button>
+        </div>
+      </div>
       <div class="fighter">
         <canvas id="bossArt" class="sprite-art" aria-label="Nerith the Tidecaller"></canvas>
         <div class="name" id="bossName">—</div>
@@ -52,7 +60,6 @@
           <input id="uploadInput" type="file" accept="audio/*">
         </label>
         <button id="takeHitBtn" class="danger hidden">Take the hit</button>
-        <button id="againBtn" class="primary hidden">Fight again</button>
         <button id="trainBtn" class="secondary">Voice training</button>
       </div>
       <div id="status" class="status">Loading spells…</div>
@@ -66,7 +73,7 @@
 
     <section class="analysis">
       <h2>Your last cast</h2>
-      <p class="muted small">Your recording is filtered with the FFT to keep 80 Hz to 4 kHz, and background noise is removed (top left). Its frequencies over time (bottom left) are compared with reference recordings of the spell. Each spell has four references, spoken by different computer voices, and bottom right shows the one your voice matched best. The match is measured with normalized correlation at a range of time shifts (top right), and the peak ρ sets the spell's power.</p>
+      <p class="muted small">Your recording is filtered with the FFT to keep 80 Hz to 7 kHz, and background noise is removed (top left). Its frequencies over time (bottom left) are compared with the spell's references: four computer voices plus your own training take, if you recorded one. Bottom right shows the reference your cast matched best. The match is measured with normalized correlation at a range of time shifts (top right), and the peak ρ sets the spell's power.</p>
       <div class="charts">
         <canvas id="chartSpectrum" class="chart"></canvas>
         <canvas id="chartCorr" class="chart"></canvas>

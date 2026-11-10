@@ -1,6 +1,6 @@
 // Tests for js/dsp.js. Run with: node tests/run_tests.js
 // 1. FFT matches the DFT sum computed directly (N^2 way)
-// 2. Bandpass keeps a tone inside 80 Hz to 4 kHz, removes tones outside
+// 2. Bandpass keeps a tone inside 80 Hz to 7 kHz, removes tones outside
 // 3. Test recordings score highest on the spell that was said
 // 4. Scores as background noise gets louder
 // 5. Saying the word twice scores the same as saying it once
@@ -57,7 +57,7 @@ function check(name, ok, info) {
   const fs = 16000, n = 16000, x = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const t = i / fs;
-    x[i] = Math.sin(2 * Math.PI * 30 * t) + Math.sin(2 * Math.PI * 1000 * t) + Math.sin(2 * Math.PI * 6000 * t);
+    x[i] = Math.sin(2 * Math.PI * 30 * t) + Math.sin(2 * Math.PI * 1000 * t) + Math.sin(2 * Math.PI * 7500 * t);
   }
   const y = DSP.bandpass(x, fs, DSP.F_LOW, DSP.F_HIGH).y;
   // Amplitude of each tone: inner product with sin and cos at that frequency
@@ -71,7 +71,7 @@ function check(name, ok, info) {
   };
   check('Bandpass keeps 1000 Hz', Math.abs(amp(1000) - 1) < 0.02, 'amp ' + amp(1000).toFixed(3));
   check('Bandpass removes 30 Hz', amp(30) < 0.02, 'amp ' + amp(30).toFixed(3));
-  check('Bandpass removes 6000 Hz', amp(6000) < 0.02, 'amp ' + amp(6000).toFixed(3));
+  check('Bandpass removes 7500 Hz', amp(7500) < 0.02, 'amp ' + amp(7500).toFixed(3));
 }
 
 // ---- 3. Score matrix: each test recording vs each spell ----

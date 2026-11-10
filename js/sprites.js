@@ -166,14 +166,30 @@
     // Leave headroom above the sprite for effects like the bubble
     const px = Math.max(1, Math.floor(Math.min(cw / (W + 10), ch / (H + 14))));
     const ox = Math.round((cw - W * px) / 2), oy = ch - H * px - 2 * px;
+    // sink: 0 = standing, 1 = fully melted into a puddle
+    const sink = opts.sink || 0, base = oy + H * px, dy = Math.round(sink * H * px);
     // Shadow under the feet
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.ellipse(ox + W * px / 2, oy + H * px, W * px * 0.36, px * 1.6, 0, 0, 2 * Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(ox + W * px / 2, base, W * px * 0.36 * (1 - sink), px * 1.6, 0, 0, 2 * Math.PI); ctx.fill();
+    // Draw the sprite, cut off at the ground so it sinks out of view
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, cw, base); ctx.clip();
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const c = grid[y][x];
       if (c === '.') continue;
       ctx.fillStyle = opts.flash && c !== 'K' ? '#ffffff' : pal[c];
-      ctx.fillRect(ox + x * px, oy + y * px, px, px);
+      ctx.fillRect(ox + x * px, oy + y * px + dy, px, px);
+    }
+    ctx.restore();
+    // Puddle that grows as the sprite sinks
+    if (sink > 0) {
+      const cx = ox + W * px / 2, rx = W * px * (0.12 + 0.42 * sink), ry = px * (1 + 1.6 * sink);
+      ctx.fillStyle = '#1f8197';
+      ctx.beginPath(); ctx.ellipse(cx, base, rx, ry, 0, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = '#5fdcff';
+      ctx.beginPath(); ctx.ellipse(cx, base - ry * 0.2, rx * 0.8, ry * 0.6, 0, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = 'rgba(227,251,255,0.8)';
+      ctx.fillRect(Math.round(cx - rx * 0.4), Math.round(base - ry * 0.5), Math.round(rx * 0.25), Math.max(2, px / 2));
     }
     if (opts.tint) {
       ctx.globalCompositeOperation = 'source-atop';

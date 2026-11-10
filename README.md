@@ -27,7 +27,9 @@ Each spell's effect is scaled by its power.
 
 For example, a Fireball said at 50% power does 13 damage, and a Shield at 50% power blocks half of the attack.
 
-**Voice training.** The first time you open the game, it asks you to say each spell once. Each recording is added as an extra reference for that spell, so the game compares your voice with your own voice as well as with four computer voices. The recordings are saved in your browser, so you only train once. The **Voice training** button lets you redo any spell.
+**Voice training.** Each time you open the game, it asks you to record each spell. One take per spell is enough to start, and up to three are kept. Each take is added as an extra reference for that spell, so the game compares your voice with your own voice as well as with four computer voices. Takes last for the session. The **Voice training** button lets you add or replace takes during the fight.
+
+When Nerith's HP reaches 0, he melts into a puddle. You can then play again or fight a stronger Nerith.
 
 On your turn, pick a spell, press **Hear it** to hear the incantation, then press **Record** and say it. You can also upload an audio file. Nerith the Tidecaller then casts Water Jet (11 damage), Tidal Wave (20 damage), Healing Rain (heals 18), or Bubble Barrier. When an attack is coming, you can say "Shield" to block it or take the hit.
 
@@ -35,13 +37,13 @@ On your turn, pick a spell, press **Hear it** to hear the incantation, then pres
 
 All of the signal processing is in [`js/dsp.js`](js/dsp.js).
 
-1. **Bandpass filter.** The game takes the fft of the recording, multiplies by H(s) = rect(s/2f_high) − rect(s/2f_low) with f_low = 80 Hz and f_high = 4 kHz, and takes the inverse fft. H depends only on |s|, so the +nΔf and −nΔf points are kept together and the result stays real. This removes hum below the voice and hiss above it.
+1. **Bandpass filter.** The game takes the fft of the recording, multiplies by H(s) = rect(s/2f_high) − rect(s/2f_low) with f_low = 80 Hz and f_high = 7 kHz, and takes the inverse fft. H depends only on |s|, so the +nΔf and −nΔf points are kept together and the result stays real. This removes hum below the voice and hiss above it. The top edge is 7 kHz because hissing sounds like the f and s in "Focus" or the sh in "Shield" are mostly between 4 and 7 kHz. With the edge at 4 kHz, Focus scored noticeably lower.
 
    ![Part a](docs/figures/partA_spectrum.png)
 
-   *Part a. The spectrum |X(f)| of a noisy recording of "Fireball," shown with fftshift. Outside ±4 kHz there is only noise, and the bandpass removes it on both the positive and negative sides. The thin gap at 0 is the ±80 Hz cut.*
+   *Part a. The spectrum |X(f)| of a noisy recording of "Fireball," shown with fftshift. Outside ±7 kHz there is only noise, and the bandpass removes it on both the positive and negative sides. The thin gap at 0 is the ±80 Hz cut.*
 
-2. **Resampling.** The browser records at 48 kHz. The game converts to 16 kHz with linear interpolation. The bandpass already removed everything above 4 kHz, so 1/Δt = 16 kHz ≥ 2 · 4 kHz and nothing aliases.
+2. **Resampling.** The browser records at 48 kHz. The game converts to 16 kHz with linear interpolation. The bandpass already removed everything above 7 kHz, so 1/Δt = 16 kHz ≥ 2 · 7 kHz and nothing aliases.
 3. **Noise removal.** The signal is cut into short pieces and each piece is fft'd. The quietest 10% of pieces are taken as background noise, which gives a noise level at each frequency. Each piece is scaled down at frequencies where the noise is as strong as the voice, then inverse fft'd.
 
    ![Part b](docs/figures/partB_noise_removal.png)
@@ -65,16 +67,16 @@ All of the signal processing is in [`js/dsp.js`](js/dsp.js).
 
 | Spell selected | Right word said (average) | Right word said (worst voice) | Wrong word said (average) |
 |:--|:--|:--|:--|
-| Fireball | 0.72 | 0.65 | 0.43 |
-| Focus | 0.75 | 0.67 | 0.42 |
-| Lightning Bolt | 0.70 | 0.53 | 0.46 |
-| Shield | 0.91 | 0.81 | 0.54 |
+| Fireball | 0.75 | 0.65 | 0.42 |
+| Focus | 0.80 | 0.68 | 0.46 |
+| Lightning Bolt | 0.71 | 0.55 | 0.44 |
+| Shield | 0.90 | 0.82 | 0.55 |
 
-For example, the Fireball row means: when the six test voices said "Fireball," their recordings averaged ρ = 0.72 against the Fireball references, and the lowest was 0.65. When they said one of the other three spells, the score against Fireball averaged 0.43, which fizzles.
+For example, the Fireball row means: when the six test voices said "Fireball," their recordings averaged ρ = 0.75 against the Fireball references, and the lowest was 0.65. When they said one of the other three spells, the score against Fireball averaged 0.42, which fizzles.
 
-For every spell, the right word scores well above 0.5 and the wrong words average below it, except for Shield. Shield is the most forgiving. A wrong word averages 0.54 there, which would still block about 13% of an attack.
+For every spell, the right word scores well above 0.5 and the wrong words average below it, except for Shield. Shield is the most forgiving. A wrong word averages 0.55 there, which would still block about 17% of an attack.
 
-The test also checked which spell each recording matched best. In 23 of the 24 recordings, that was the spell actually said. The one miss was a high-pitched voice saying "Focus," which scored 0.68 on Shield and 0.67 on Focus. This cannot cause a problem in a fight, since Focus can only be cast on your turn and Shield only when Nerith attacks.
+The test also checked which spell each recording matched best. In all 24 recordings, that was the spell actually said.
 
 ![Part d](docs/figures/partD_scores.png)
 
@@ -84,18 +86,18 @@ The test also checked which spell each recording matched best. In 23 of the 24 r
 
 | Voice power / noise power | 40 dB | 20 dB | 10 dB | 5 dB | 0 dB |
 |:--|:--|:--|:--|:--|:--|
-| With noise removal | 0.74 | 0.72 | 0.67 | 0.61 | 0.57 |
-| Bandpass only | 0.74 | 0.68 | 0.61 | 0.56 | 0.49 |
+| With noise removal | 0.76 | 0.75 | 0.71 | 0.66 | 0.61 |
+| Bandpass only | 0.77 | 0.72 | 0.64 | 0.59 | 0.53 |
 
-At 0 dB the noise is as strong as the voice. With noise removal, the right word still stays above the fizzle line.
+At 0 dB the noise is as strong as the voice. Noise removal keeps the right word well above the fizzle line. With the bandpass alone, it barely clears it.
 
 ![Part e](docs/figures/partE_noise.png)
 
 *Part e. The same results as a plot, with the wrong-word score added.*
 
-**Limitation and voice training.** All of the test voices are text-to-speech. A real voice scored much lower against the computer-voice references (ρ = 0.27 to 0.47 in a first try), so every spell fizzled. That is why the game asks you to record each spell once. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
+**Limitation and voice training.** All of the test voices are text-to-speech. A real voice scored much lower against the computer-voice references (ρ = 0.27 to 0.47 in a first try), so every spell fizzled. That is why the game asks you to record each spell. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
 
-The figures were made with [`report_figures.m`](report_figures.m) in MATLAB. To rerun the tests: `node tests/run_tests.js`. It also checks that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 6 kHz tones.
+The figures were made with [`report_figures.m`](report_figures.m) in MATLAB. To rerun the tests: `node tests/run_tests.js`. It also checks that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 7.5 kHz tones.
 
 ## Running it
 

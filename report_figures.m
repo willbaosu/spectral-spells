@@ -14,11 +14,11 @@ t = (0:N-1)' * dt;
 rng(7);
 xn = x + randn(N, 1) * sqrt(mean(x.^2) / 10);
 
-% Bandpass with the FFT: keep 80 Hz <= |f| <= 4 kHz
+% Bandpass with the FFT: keep 80 Hz <= |f| <= 7 kHz
 X = fft(xn);
 f = (0:N-1)' * fs / N;
 f(f >= fs/2) = f(f >= fs/2) - fs;
-H = abs(f) >= 80 & abs(f) <= 4000;
+H = abs(f) >= 80 & abs(f) <= 7000;
 xb = real(ifft(X .* H));
 
 % Part a: two-sided spectrum before and after the bandpass
@@ -97,7 +97,7 @@ for i = 1:3
         S(:, k) = fft(y((k-1)*hop + (1:L)) .* w);
     end
     fk = (0:L-1) * fy / L;
-    keep = fk <= 4000;
+    keep = fk <= 7000;
     D = 20*log10(abs(S(keep, :)) + 1e-6);
     tk = ((0:nP-1)*hop + L/2) / fy;
     subplot(1, 3, i);
@@ -114,8 +114,8 @@ colormap(hot);
 
 % Test results from node tests/run_tests.js
 spells = {'Fireball', 'Focus', 'Lightning Bolt', 'Shield'};
-rightRho = [0.72 0.75 0.70 0.91];
-wrongRho = [0.43 0.42 0.46 0.54];
+rightRho = [0.75 0.80 0.71 0.90];
+wrongRho = [0.42 0.46 0.44 0.55];
 
 % Part d: right word vs wrong word
 figure('Position', [100 100 600 400]);
@@ -134,9 +134,9 @@ grid on;
 
 % Part e: score vs background noise
 snr = [40 30 20 15 10 5 0];
-withNR = [0.74 0.74 0.72 0.70 0.67 0.61 0.57];
-bpOnly = [0.74 0.72 0.68 0.65 0.61 0.56 0.49];
-wrongW = [0.47 0.46 0.44 0.43 0.42 0.39 0.37];
+withNR = [0.76 0.77 0.75 0.74 0.71 0.66 0.61];
+bpOnly = [0.77 0.75 0.72 0.70 0.64 0.59 0.53];
+wrongW = [0.48 0.48 0.46 0.45 0.44 0.41 0.38];
 figure('Position', [100 100 600 400]);
 plot(snr, withNR, 'o-', 'LineWidth', 1.5);
 hold on;

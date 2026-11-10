@@ -7,7 +7,7 @@
 
   DSP.FS = 16000;           // sampling rate 1/Δt (Hz)
   DSP.F_LOW = 80;           // bandpass f_low (Hz)
-  DSP.F_HIGH = 4000;        // bandpass f_high (Hz)
+  DSP.F_HIGH = 7000;        // bandpass f_high (Hz); keeps hissing sounds like f, s, sh
   DSP.FRAME = 512;          // N per short fft: 32 ms, Δf = 1/(NΔt) = 31.25 Hz
   DSP.HOP = 160;            // step between short ffts: 10 ms
   DSP.N_BANDS = 24;         // frequency bands per short fft
@@ -111,8 +111,8 @@
   // ---------- Resampling ----------
 
   // Linear interpolation: f(x1 + Δ) = f(x1)(1 - Δ/(x2 - x1)) + f(x2)Δ/(x2 - x1).
-  // Done after the bandpass: nothing is left above 4 kHz, so the new
-  // rate 1/Δt = 16 kHz >= 2 · 4 kHz and there is no aliasing.
+  // Done after the bandpass: nothing is left above 7 kHz, so the new
+  // rate 1/Δt = 16 kHz >= 2 · 7 kHz and there is no aliasing.
   DSP.resample = function (x, fsIn, fsOut) {
     if (fsIn === fsOut) return Float64Array.from(x);
     const n = Math.floor(x.length * fsOut / fsIn);

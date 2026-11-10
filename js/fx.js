@@ -296,6 +296,13 @@
     return new Promise(res => setTimeout(res, 500));
   };
 
+  // Nerith melts: a big splash of water and two rings
+  FX.splash = function (at) {
+    particles(at, { n: 70, speed: 380, up: -220, size: 8, colors: ['#ffffff', '#a6f4fa', '#5fdcff', '#2a9fd0'], life: 1.1, gravity: 700 });
+    add(ring(at, '#a6f4fa', 160, 0.6));
+    setTimeout(() => add(ring(at, '#5fdcff', 110, 0.5)), 150);
+  };
+
   // Burst of bubbles when Lightning Bolt pops the barrier
   FX.pop = function (at) {
     particles(at, { n: 30, speed: 260, size: 6, colors: ['#e3fbff', '#a6f4fa', '#5fdcff'], life: 0.6 });
