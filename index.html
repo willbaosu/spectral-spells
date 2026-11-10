@@ -13,6 +13,13 @@
   </header>
 
   <main>
+    <section id="training" class="training hidden">
+      <h2>Voice training</h2>
+      <p class="muted small">Say each spell once so the game learns your voice. Each recording is added to that spell's computer-voice references and saved in this browser, so you only do this once. You can retrain any spell later with the Voice training button.</p>
+      <div id="trainList" class="train-list"></div>
+      <div class="cast-row"><button id="trainDoneBtn" class="primary">Start the fight</button></div>
+    </section>
+
     <section class="battle">
       <canvas id="fx" class="fx" aria-hidden="true"></canvas>
       <div class="fighter">
@@ -46,6 +53,7 @@
         </label>
         <button id="takeHitBtn" class="danger hidden">Take the hit</button>
         <button id="againBtn" class="primary hidden">Fight again</button>
+        <button id="trainBtn" class="secondary">Voice training</button>
       </div>
       <div id="status" class="status">Loading spells…</div>
       <div id="result" class="result hidden">

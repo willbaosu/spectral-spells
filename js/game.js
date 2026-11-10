@@ -33,7 +33,8 @@
     refs: {}, refAudio: {}, selected: 'fireball', ctx: null,
     phase: 'loading', player: PLAYER_MAX, focus: { turns: 0, bonus: 0 },
     boss: null, level: 1, incoming: null, busy: false,
-    wins: 0, casts: 0, bestRho: 0, bossR: null, playerR: null
+    wins: 0, casts: 0, bestRho: 0, bossR: null, playerR: null,
+    fightStarted: false
   };
 
   // ---------- Audio ----------
@@ -89,7 +90,8 @@
     try { new Audio(`enemy/${id}.wav`).play().catch(() => {}); } catch (e) { /* no audio */ }
   }
 
-  async function recordVoice(word) {
+  async function recordVoice(word, onTick) {
+    onTick = onTick || setStatus;
     const stream = await navigator.mediaDevices.getUserMedia({
       // Turn off the browser's own processing so our filters do the work
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
@@ -100,7 +102,7 @@
     const done = new Promise(r => (rec.onstop = r));
     rec.start();
     for (let t = RECORD_SEC; t > 0; t--) {
-      setStatus(`Recording… say "${word}" (${t})`);
+      onTick(`Recording… say "${word}" (${t})`);
       await wait(1000);
     }
     rec.stop();
@@ -227,6 +229,7 @@
     $('takeHitBtn').classList.toggle('hidden', p !== 'react');
     $('takeHitBtn').disabled = busy;
     $('againBtn').classList.toggle('hidden', p !== 'won' && p !== 'lost');
+    $('trainBtn').disabled = busy || p !== 'attack';
   }
 
   function setBusy(b) { state.busy = b; refreshControls(); }
@@ -385,6 +388,124 @@
     else await castAttack(audio);
   }
 
+  // ---------- Voice training ----------
+
+  // You say each spell once. Your recording is added as a fifth
+  // reference for that spell, so the game compares your voice with
+  // your own voice as well as the computer voices. It is saved in this
+  // browser, so training only has to be done once.
+  const TRAIN_KEY = 'spectralSpells.voice.v1';
+  const yours = id => state.refs[id].find(r => r.voice === 'you');
+
+  // Store the 16 kHz recording as 16-bit numbers in base64 text
+  function encode16(x) {
+    const b = new Uint8Array(2 * x.length), v = new DataView(b.buffer);
+    for (let i = 0; i < x.length; i++) v.setInt16(2 * i, Math.max(-1, Math.min(1, x[i])) * 32767, true);
+    let s = '';
+    for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
+    return btoa(s);
+  }
+
+  function decode16(text) {
+    const s = atob(text), b = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+    const v = new DataView(b.buffer), x = new Float64Array(b.length / 2);
+    for (let i = 0; i < x.length; i++) x[i] = v.getInt16(2 * i, true) / 32768;
+    return x;
+  }
+
+  // x: your filtered recording at 16 kHz
+  function addYourRef(id, x) {
+    const F = DSP.features(x, DSP.FS);
+    state.refs[id] = state.refs[id].filter(r => r.voice !== 'you');
+    state.refs[id].push({ voice: 'you', feat: F.feat, spec: F.spec, binHz: F.binHz, x });
+  }
+
+  function loadTraining() {
+    try {
+      const d = JSON.parse(localStorage.getItem(TRAIN_KEY) || '{}');
+      for (const id in d) if (state.refs[id]) addYourRef(id, decode16(d[id]));
+    } catch (e) { /* storage unavailable: train again */ }
+  }
+
+  function saveTraining() {
+    try {
+      const d = {};
+      SPELLS.forEach(s => { const r = yours(s.id); if (r) d[s.id] = encode16(r.x); });
+      localStorage.setItem(TRAIN_KEY, JSON.stringify(d));
+    } catch (e) { /* storage unavailable: kept for this visit only */ }
+  }
+
+  function buildTraining() {
+    const box = $('trainList');
+    SPELLS.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'train-row';
+      row.style.setProperty('--spell-color', s.color);
+      row.innerHTML = `<span class="sname">${s.name}</span>
+        <button class="secondary t-hear">▶ Hear it</button>
+        <button class="primary t-rec">● Record</button>
+        <span class="t-status muted small"></span>`;
+      row.querySelector('.t-hear').onclick = () => playSamples(state.refAudio[s.id]);
+      row.querySelector('.t-rec').onclick = () => trainSpell(s.id, row);
+      row.dataset.id = s.id;
+      box.appendChild(row);
+    });
+  }
+
+  function updateTraining() {
+    let n = 0;
+    document.querySelectorAll('.train-row').forEach(row => {
+      const done = !!yours(row.dataset.id);
+      if (done) n++;
+      const st = row.querySelector('.t-status');
+      if (!row.dataset.msg) st.textContent = done ? '✓ Trained' : 'Not trained yet';
+      row.querySelector('.t-rec').textContent = done ? '● Record again' : '● Record';
+      row.querySelectorAll('button').forEach(b => (b.disabled = state.busy));
+    });
+    $('trainDoneBtn').disabled = state.busy;
+    $('trainDoneBtn').textContent = n === 0 ? 'Skip (use computer voices only)'
+      : state.fightStarted ? 'Back to the fight' : `Start the fight (${n} of 4 trained)`;
+  }
+
+  async function trainSpell(id, row) {
+    if (state.busy) return;
+    const s = SPELLS.find(x => x.id === id), st = row.querySelector('.t-status');
+    state.busy = true; updateTraining();
+    row.dataset.msg = '1';
+    try {
+      const audio = await recordVoice(s.name, t => (st.textContent = t));
+      const proc = DSP.process(audio.x, audio.fs);
+      if (!heard(audio, proc)) {
+        st.textContent = 'Nothing was heard. Try again closer to the mic.';
+      } else {
+        const computer = state.refs[id].filter(r => r.voice !== 'you').map(r => r.feat);
+        const rho = DSP.scoreMulti(computer, proc.feat).rho;
+        addYourRef(id, Float64Array.from(proc.filtered));
+        saveTraining();
+        st.textContent = `✓ Trained. Match with the computer voices: ρ = ${rho.toFixed(2)}`;
+      }
+    } catch (err) {
+      st.textContent = 'Microphone error: ' + err.message;
+    }
+    state.busy = false; updateTraining();
+  }
+
+  function openTraining() {
+    state.phase = 'training';
+    document.querySelectorAll('.train-row').forEach(r => delete r.dataset.msg);
+    $('training').classList.remove('hidden');
+    updateTraining(); refreshControls();
+    setStatus('Voice training: say each spell once.');
+    $('training').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function closeTraining() {
+    $('training').classList.add('hidden');
+    if (state.fightStarted) startAttackPhase();
+    else newFight(false);
+  }
+
   // ---------- Charts ----------
 
   function drawCharts(proc, sc, s) {
@@ -420,14 +541,16 @@
     const frameSec = DSP.HOP / DSP.FS;
     Charts.spectrogram($('chartCast'), proc.spec, proc.binHz, frameSec, 'Your voice: frequencies over time');
     const ref = state.refs[s.id][sc.ref];
+    const who = ref.voice === 'you' ? 'your training recording' : `computer voice ${sc.ref + 1} of 4`;
     Charts.spectrogram($('chartRef'), ref.spec, ref.binHz, frameSec,
-      `Best-matching reference: "${s.name}", computer voice ${sc.ref + 1} of 4`);
+      `Best-matching reference: "${s.name}", ${who}`);
   }
 
   // ---------- Wire up ----------
 
   function newFight(harder) {
     if (harder) state.level++;
+    state.fightStarted = true;
     state.player = PLAYER_MAX;
     state.focus = { turns: 0, bonus: 0 };
     state.incoming = null;
@@ -478,11 +601,14 @@
     setBusy(false);
   };
   $('againBtn').onclick = () => newFight(state.phase === 'won');
+  $('trainBtn').onclick = () => { if (!state.busy && state.phase === 'attack') openTraining(); };
+  $('trainDoneBtn').onclick = () => { if (!state.busy) closeTraining(); };
 
   window.addEventListener('resize', () => { if (state.boss) { drawBoss(); drawPlayer(); updateAura(); } });
 
   FX.init($('fx'));
   buildSpellbook();
+  buildTraining();
   select('fireball');
   newBoss();
   drawPlayer();
@@ -490,7 +616,12 @@
   refreshControls();
   setStatus('Loading spells…');
   loadSpells()
-    .then(() => newFight(false))
+    .then(() => {
+      loadTraining();
+      // Ask for training until every spell has your recording
+      if (SPELLS.every(s => yours(s.id))) newFight(false);
+      else openTraining();
+    })
     .catch(err => setStatus('Error loading spells: ' + err.message + '. Open the page through a web server, not as a file.'));
 
   // Exposed for automated testing

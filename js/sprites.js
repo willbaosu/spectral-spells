@@ -163,7 +163,8 @@
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cw, ch);
-    const px = Math.max(1, Math.floor(Math.min(cw / (W + 6), ch / (H + 3))));
+    // Leave headroom above the sprite for effects like the bubble
+    const px = Math.max(1, Math.floor(Math.min(cw / (W + 10), ch / (H + 14))));
     const ox = Math.round((cw - W * px) / 2), oy = ch - H * px - 2 * px;
     // Shadow under the feet
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -180,21 +181,25 @@
       ctx.fillRect(0, 0, cw, ch);
       ctx.globalCompositeOperation = 'source-over';
     }
-    return { ctx, px, ox, oy, w: W * px, h: H * px };
+    return { ctx, px, ox, oy, w: W * px, h: H * px, cw, ch };
   }
 
   function drawBoss(canvas, opts) {
     opts = opts || {};
     const r = drawGrid(canvas, BOSS, BOSS_PAL, opts);
     if (opts.bubble) {
-      const { ctx, ox, oy, w, h } = r;
-      const g = ctx.createRadialGradient(ox + w / 2, oy + h / 2, w * 0.2, ox + w / 2, oy + h / 2, w * 0.7);
+      const { ctx, ox, oy, w, h, cw, ch } = r;
+      // Bubble around Nerith, sized so it never runs off the canvas
+      const cx = ox + w / 2, cy = oy + h * 0.47;
+      const rx = Math.min(w * 0.6, cx - 4, cw - cx - 4);
+      const ry = Math.min(h * 0.55, cy - 4, ch - cy - 4);
+      const g = ctx.createRadialGradient(cx, cy, rx * 0.3, cx, cy, rx * 1.1);
       g.addColorStop(0, 'rgba(120,220,255,0.05)'); g.addColorStop(1, 'rgba(120,220,255,0.28)');
       ctx.fillStyle = g; ctx.strokeStyle = 'rgba(170,240,255,0.95)'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.ellipse(ox + w / 2, oy + h / 2, w * 0.6, h * 0.56, 0, 0, 2 * Math.PI);
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
       ctx.fill(); ctx.stroke();
       ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(ox + w * 0.32, oy + h * 0.2, w * 0.12, Math.PI * 1.05, Math.PI * 1.5); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx * 0.8, ry * 0.8, 0, Math.PI * 1.1, Math.PI * 1.4); ctx.stroke();
     }
     return r;
   }

@@ -27,6 +27,8 @@ Each spell's effect is scaled by its power.
 
 For example, a Fireball said at 50% power does 13 damage, and a Shield at 50% power blocks half of the attack.
 
+**Voice training.** The first time you open the game, it asks you to say each spell once. Each recording is added as an extra reference for that spell, so the game compares your voice with your own voice as well as with four computer voices. The recordings are saved in your browser, so you only train once. The **Voice training** button lets you redo any spell.
+
 On your turn, pick a spell, press **Hear it** to hear the incantation, then press **Record** and say it. You can also upload an audio file. Nerith the Tidecaller then casts Water Jet (11 damage), Tidal Wave (20 damage), Healing Rain (heals 18), or Bubble Barrier. When an attack is coming, you can say "Shield" to block it or take the hit.
 
 ## How the scoring works
@@ -53,7 +55,7 @@ All of the signal processing is in [`js/dsp.js`](js/dsp.js).
 
    *Part c. Short ffts of three recordings: time left to right, frequency bottom to top, brighter is stronger. The horizontal stripes in the reference are the harmonics f, 2f, 3f, ... of the voice. The new voice saying "Fireball" has the same overall shape as the reference. Saying "Focus" does not.*
 
-6. **Correlation.** Your result C is compared with each reference R using normalized correlation, ρ = Σ R·C / √(ΣR² · ΣC²). The game slides your recording up to ±150 ms and stretches it between 80% and 125% to allow for timing. It keeps the highest ρ across the four reference voices of the spell.
+6. **Correlation.** Your result C is compared with each reference R using normalized correlation, ρ = Σ R·C / √(ΣR² · ΣC²). The game slides your recording up to ±150 ms and stretches it between 80% and 125% to allow for timing. It keeps the highest ρ across all references of the spell: four computer voices plus your training recording.
 
 ## Test results
 
@@ -91,7 +93,7 @@ At 0 dB the noise is as strong as the voice. With noise removal, the right word 
 
 *Part e. The same results as a plot, with the wrong-word score added.*
 
-**Limitation.** All of the test voices are text-to-speech. Real voices may score lower. If casting feels too hard, lower `RHO_FAIL` and `RHO_FULL` at the bottom of `js/dsp.js`.
+**Limitation and voice training.** All of the test voices are text-to-speech. A real voice scored much lower against the computer-voice references (ρ = 0.27 to 0.47 in a first try), so every spell fizzled. That is why the game asks you to record each spell once. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
 
 The figures were made with [`report_figures.m`](report_figures.m) in MATLAB. To rerun the tests: `node tests/run_tests.js`. It also checks that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 6 kHz tones.
 
