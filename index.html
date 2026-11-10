@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spectral Spells</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Spectral Spells</h1>
+    <p class="tag">Cast spells by saying them into your mic. Nerith the Tidecaller fights back with water magic.</p>
+  </header>
+
+  <main>
+    <section class="battle">
+      <canvas id="fx" class="fx" aria-hidden="true"></canvas>
+      <div class="fighter">
+        <canvas id="bossArt" class="sprite-art" aria-label="Nerith the Tidecaller"></canvas>
+        <div class="name" id="bossName">—</div>
+        <div class="bar"><div id="bossHp" class="fill enemy-fill"></div></div>
+        <div class="hp-text" id="bossHpText"></div>
+        <div class="effect" id="bossStatus"></div>
+      </div>
+      <div class="fighter">
+        <canvas id="playerArt" class="sprite-art" aria-label="You"></canvas>
+        <div class="name">You</div>
+        <div class="bar"><div id="playerHp" class="fill player-fill"></div></div>
+        <div class="hp-text" id="playerHpText"></div>
+        <div class="effect" id="playerStatus"></div>
+        <div class="stats" id="statsText"></div>
+      </div>
+    </section>
+
+    <section class="spellbook">
+      <h2>Spellbook</h2>
+      <div id="spells" class="spell-grid"></div>
+    </section>
+
+    <section class="cast">
+      <div class="cast-row">
+        <button id="listenBtn" class="secondary">▶ Hear it</button>
+        <button id="recordBtn" class="primary">● Record (3 s)</button>
+        <label id="uploadLabel" class="secondary file-btn">⇪ Upload a recording
+          <input id="uploadInput" type="file" accept="audio/*">
+        </label>
+        <button id="takeHitBtn" class="danger hidden">Take the hit</button>
+        <button id="againBtn" class="primary hidden">Fight again</button>
+      </div>
+      <div id="status" class="status">Loading spells…</div>
+      <div id="result" class="result hidden">
+        <div class="metric"><span>Correlation ρ</span><b id="rhoText">—</b></div>
+        <div class="metric"><span>Power</span><b id="effText">—</b></div>
+        <div class="metric"><span>Result</span><b id="outText">—</b></div>
+      </div>
+      <ol id="log" class="log"></ol>
+    </section>
+
+    <section class="analysis">
+      <h2>Your last cast</h2>
+      <p class="muted small">Your recording is filtered with the FFT to keep 80 Hz to 4 kHz, and background noise is removed (top left). Its frequencies over time (bottom left) are compared with reference recordings of the spell. Each spell has four references, spoken by different computer voices, and bottom right shows the one your voice matched best. The match is measured with normalized correlation at a range of time shifts (top right), and the peak ρ sets the spell's power.</p>
+      <div class="charts">
+        <canvas id="chartSpectrum" class="chart"></canvas>
+        <canvas id="chartCorr" class="chart"></canvas>
+        <canvas id="chartCast" class="chart"></canvas>
+        <canvas id="chartRef" class="chart"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <footer class="muted small">
+    EE 102A final project. The signal processing is in <code>js/dsp.js</code>.
+  </footer>
+
+  <script src="js/dsp.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/fx.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
