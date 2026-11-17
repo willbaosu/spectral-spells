@@ -114,7 +114,7 @@ Scaling raises the right-word and wrong-word scores by about the same amount, so
 
 **Voice training.** A real voice scored much lower in a first try through the live microphone in the game (ρ = 0.27 to 0.47), so every spell fizzled. That is why the game asks you to record each spell. The real test recordings above are short clean clips, which score higher than a live cast with room noise. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
 
-**Rerunning.** `node tests/run_tests.js` runs the tests and saves the numbers to `tests/results.json`. Then [`report_figures.m`](report_figures.m) reads that file and makes the figures in MATLAB. The tests also check that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 7.5 kHz tones.
+**Rerunning.** Running [`report_figures.m`](report_figures.m) in MATLAB runs the tests with Node.js (`node tests/run_tests.js`), which saves the numbers to `tests/results.json`, then makes the figures from that file. The tests also check that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 7.5 kHz tones.
 
 ## Running it
 
