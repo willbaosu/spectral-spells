@@ -112,36 +112,45 @@ for i = 1:3
 end
 colormap(hot);
 
-% Test results from node tests/run_tests.js
-spells = {'Fireball', 'Focus', 'Lightning Bolt', 'Shield'};
-rightRho = [0.75 0.80 0.71 0.90];
-wrongRho = [0.42 0.46 0.44 0.55];
+% Test results, saved by node tests/run_tests.js
+r = jsondecode(fileread('tests/results.json'));
+spells = r.names;
+hasReal = ~isempty(r.real);
 
-% Part d: right word vs wrong word
+% Part d: right word vs wrong word for each spell
+ttsRight = [r.tts.per.right_mean]';
+ttsWrong = [r.tts.per.wrong_mean]';
+if hasReal
+    realRight = [r.real.per.right_mean]';
+    realWrong = [r.real.per.wrong_mean]';
+    D = [ttsRight ttsWrong realRight realWrong];
+    names = {'Text-to-speech, said this spell', ...
+        'Text-to-speech, said another spell', ...
+        'Real voices, said this spell', ...
+        'Real voices, said another spell'};
+else
+    D = [ttsRight ttsWrong];
+    names = {'Said this spell', 'Said another spell'};
+end
 figure('Position', [100 100 600 400]);
-bar([rightRho' wrongRho']);
+bar(D);
 hold on;
 plot([0.5 4.5], [0.5 0.5], 'r--', 'LineWidth', 1.5);
 plot([0.5 4.5], [0.8 0.8], 'g--', 'LineWidth', 1.5);
 set(gca, 'XTick', 1:4, 'XTickLabel', spells);
-ylim([0 1.3]);
+ylim([0 1.7]);
 ylabel('Average peak \rho');
-legend('Said this spell', 'Said another spell', ...
-    'Fizzle below', 'Full power above', ...
+legend([names, {'Fizzle below', 'Full power above'}], ...
     'Location', 'northwest');
-title('Part d: Scores on six new voices');
+title('Part d: Right word vs wrong word');
 grid on;
 
 % Part e: score vs background noise
-snr = [40 30 20 15 10 5 0];
-withNR = [0.76 0.77 0.75 0.74 0.71 0.66 0.61];
-bpOnly = [0.77 0.75 0.72 0.70 0.64 0.59 0.53];
-wrongW = [0.48 0.48 0.46 0.45 0.44 0.41 0.38];
 figure('Position', [100 100 600 400]);
-plot(snr, withNR, 'o-', 'LineWidth', 1.5);
+plot(r.noise.snr, r.noise.denoise, 'o-', 'LineWidth', 1.5);
 hold on;
-plot(snr, bpOnly, 's-', 'LineWidth', 1.5);
-plot(snr, wrongW, '^-', 'LineWidth', 1.5);
+plot(r.noise.snr, r.noise.bandpass, 's-', 'LineWidth', 1.5);
+plot(r.noise.snr, r.noise.wrong, '^-', 'LineWidth', 1.5);
 plot([0 40], [0.5 0.5], 'r--', 'LineWidth', 1.5);
 set(gca, 'XDir', 'reverse');
 xlabel('Voice power / noise power (dB)');
@@ -150,4 +159,28 @@ legend('Right word, noise removal', ...
     'Right word, bandpass only', 'Wrong word', ...
     'Fizzle below', 'Location', 'southwest');
 title('Part e: Score vs background noise');
+grid on;
+
+% Part f: frequency scaling on and off
+S = r.scaling;
+groups = {'Text-to-speech'};
+F = [S.tts.off.right S.tts.on.right ...
+    S.tts.off.wrong S.tts.on.wrong];
+if hasReal
+    groups = [groups, {'Real voices'}];
+    F = [F; S.real.off.right S.real.on.right ...
+        S.real.off.wrong S.real.on.wrong];
+end
+figure('Position', [100 100 600 400]);
+bar(F);
+hold on;
+plot([0.5 numel(groups)+0.5], [0.5 0.5], 'r--', ...
+    'LineWidth', 1.5);
+set(gca, 'XTick', 1:numel(groups), 'XTickLabel', groups);
+ylim([0 1.5]);
+ylabel('Average peak \rho');
+legend('Right word, no scaling', 'Right word, scaling', ...
+    'Wrong word, no scaling', 'Wrong word, scaling', ...
+    'Fizzle below', 'Location', 'northwest');
+title('Part f: Frequency scaling on and off');
 grid on;

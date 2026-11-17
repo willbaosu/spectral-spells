@@ -62,58 +62,59 @@ All of the signal processing is in [`js/dsp.js`](js/dsp.js).
 
 ## Test results
 
-**How it was tested.** Each spell currently has four reference recordings, made with text-to-speech voices. The game compares your voice against these. To check that the game also works on voices it has never heard, 24 test recordings were made with six other text-to-speech voices. Each test voice says all four spells. Every test recording was then scored against every spell.
+**How it was tested.** Each spell currently has four reference recordings, made with text-to-speech voices. The game compares your voice against these. To check that it also works on voices it has never heard, two sets of test recordings were scored against every spell:
+
+- **Text-to-speech:** six other text-to-speech voices, each saying all four spells (24 recordings).
+- **Real voices:** two people, each saying all four spells once (8 recordings). More speakers and takes will be added.
 
 **Does saying the right spell score higher than saying the wrong one?** Each number is a peak ρ.
 
-| Spell selected | Right word said (average) | Right word said (worst voice) | Wrong word said (average) |
-|:--|:--|:--|:--|
-| Fireball | 0.75 | 0.65 | 0.42 |
-| Focus | 0.80 | 0.68 | 0.46 |
-| Lightning Bolt | 0.71 | 0.55 | 0.44 |
-| Shield | 0.90 | 0.82 | 0.55 |
+| Spell selected | Text-to-speech, right word (average) | Text-to-speech, right word (worst voice) | Text-to-speech, wrong word (average) | Real, right word (average) | Real, wrong word (average) |
+|:--|:--|:--|:--|:--|:--|
+| Fireball | 0.82 | 0.76 | 0.45 | 0.68 | 0.48 |
+| Focus | 0.83 | 0.74 | 0.49 | 0.85 | 0.53 |
+| Lightning Bolt | 0.72 | 0.60 | 0.47 | 0.66 | 0.41 |
+| Shield | 0.90 | 0.83 | 0.57 | 0.83 | 0.54 |
 
-For example, the Fireball row means: when the six test voices said "Fireball," their recordings averaged ρ = 0.75 against the Fireball references, and the lowest was 0.65. When they said one of the other three spells, the score against Fireball averaged 0.42, which fizzles.
+For example, the Fireball row means: when the six text-to-speech test voices said "Fireball," their recordings averaged ρ = 0.82 against the Fireball references, and the lowest was 0.76. When they said one of the other three spells, the score against Fireball averaged 0.45, which fizzles.
 
-For every spell, the right word scores well above 0.5 and the wrong words average below it, except for Shield. Shield is the most forgiving. A wrong word averages 0.55 there, which would still block about 17% of an attack.
+For every spell, the right word scores above 0.5 for both sets. Wrong words average close to 0.5. They are highest for Shield, and for Focus with real voices, so a wrong word there can still cast a weak spell. Lightning Bolt has the lowest right-word scores.
 
-The test also checked which spell each recording matched best. In all 24 recordings, that was the spell actually said.
+The test also checked which spell each recording matched best. That was the spell actually said in 23 of 24 text-to-speech recordings and 7 of 8 real ones. Both misses were "Lightning Bolt" scoring slightly higher on Shield.
 
 ![Part d](docs/figures/partD_scores.png)
 
-*Part d. The numbers from the table above. Blue bars should be above the red line and orange bars below it.*
+*Part d. The averages from the table above. Bars for the right word should be above the red line, and bars for the wrong word below it.*
 
-The table and figure above were measured before frequency scaling was added.
-
-**Does it work with background noise?** Random noise was added to the test recordings. The table shows the average peak ρ for the right word.
+**Does it work with background noise?** Each text-to-speech test recording got 0.5 s of silence on each side, then random noise. The table shows the average peak ρ for the right word.
 
 | Voice power / noise power | 40 dB | 20 dB | 10 dB | 5 dB | 0 dB |
 |:--|:--|:--|:--|:--|:--|
-| With noise removal | 0.76 | 0.75 | 0.71 | 0.66 | 0.61 |
-| Bandpass only | 0.77 | 0.72 | 0.64 | 0.59 | 0.53 |
+| With noise removal | 0.81 | 0.79 | 0.75 | 0.71 | 0.65 |
+| Bandpass only | 0.81 | 0.77 | 0.70 | 0.64 | 0.59 |
 
-At 0 dB the noise is as strong as the voice. Noise removal keeps the right word well above the fizzle line. With the bandpass alone, it barely clears it.
+At 0 dB the noise is as strong as the voice. Noise removal keeps the right word well above the fizzle line, and it helps more as the noise gets louder.
 
 ![Part e](docs/figures/partE_noise.png)
 
 *Part e. The same results as a plot, with the wrong-word score added.*
 
-**Frequency scaling.** The same 24 test recordings, scored with and without frequency scaling. Each number is the average peak ρ.
+**Frequency scaling.** The same recordings, scored with and without frequency scaling. Each number is the average peak ρ.
 
-| | Without scaling | With scaling |
-|:--|:--|:--|
-| Right word | 0.79 | 0.82 |
-| Wrong word | 0.47 | 0.50 |
-| Right word, low voice (one voice) | 0.85 | 0.88 |
-| Right word, high voice (one voice) | 0.74 | 0.77 |
+| | Right word, without | Right word, with | Wrong word, without | Wrong word, with |
+|:--|:--|:--|:--|:--|
+| Text-to-speech | 0.79 | 0.82 | 0.47 | 0.50 |
+| Real voices | 0.72 | 0.76 | 0.46 | 0.49 |
 
-On these voices, scaling raises the right-word and wrong-word scores by about the same amount, so the gap between them stays at 0.32. One recording (a high voice saying "Lightning Bolt") now scores slightly higher on Shield. The text-to-speech voices may not differ enough in frequency range for scaling to help. Real recordings will show whether it does.
+Scaling raises the right-word and wrong-word scores by about the same amount, so the gap between them barely changes. With only two real speakers so far, it is not yet clear whether scaling helps. More real recordings will show this.
 
-**Limitation and voice training.** All of the test voices so far are text-to-speech. A real voice scored much lower against the text-to-speech references (ρ = 0.27 to 0.47 in a first try), so every spell fizzled. That is why the game asks you to record each spell. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
+![Part f](docs/figures/partF_scaling.png)
 
-**Next: real recordings.** Several people will record each spell a few times. Some of these recordings will be added as references, and the rest will be used as test recordings.
+*Part f. The same results as a bar chart.*
 
-The figures were made with [`report_figures.m`](report_figures.m) in MATLAB. To rerun the tests: `node tests/run_tests.js`. It also checks that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 7.5 kHz tones.
+**Voice training.** A real voice scored much lower in a first try through the live microphone in the game (ρ = 0.27 to 0.47), so every spell fizzled. That is why the game asks you to record each spell. The real test recordings above are short clean clips, which score higher than a live cast with room noise. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
+
+**Rerunning.** `node tests/run_tests.js` runs the tests and saves the numbers to `tests/results.json`. Then [`report_figures.m`](report_figures.m) reads that file and makes the figures in MATLAB. The tests also check that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 7.5 kHz tones.
 
 ## Running it
 
@@ -145,6 +146,7 @@ spells/<spell>/*.wav     reference recordings
 spells/references.json   list of reference recordings for each spell
 enemy/*.wav              Nerith's spell lines
 tests/run_tests.js       tests
+tests/results.json       test numbers used by report_figures.m
 tests/audio/*.wav        text-to-speech test recordings
 tests/real/*.wav         real test recordings
 docs/                    screenshot and figures

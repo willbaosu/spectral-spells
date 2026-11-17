@@ -5,7 +5,10 @@
 // 4. Scores with and without frequency scaling
 // 5. Scores as background noise gets louder
 // 6. Saying the word twice scores the same as saying it once
-// Real recordings in tests/real are scored too, if there are any
+// Test recordings: tests/audio (text-to-speech voices) and tests/real
+// (real people), named <spell>__<speaker>.wav.
+// The numbers for the README figures are saved to tests/results.json,
+// which report_figures.m reads.
 const fs = require('fs');
 const path = require('path');
 const DSP = require('../js/dsp.js');
@@ -81,6 +84,7 @@ function check(name, ok, info) {
 const spellDir = path.join(__dirname, '..', 'spells');
 const list = JSON.parse(fs.readFileSync(path.join(spellDir, 'references.json'), 'utf8'));
 const spells = Object.keys(list).sort();
+const names = { fireball: 'Fireball', focus: 'Focus', lightning_bolt: 'Lightning Bolt', shield: 'Shield' };
 const refs = {};
 for (const s of spells) {
   refs[s] = list[s].map(r => {
@@ -89,75 +93,78 @@ for (const s of spells) {
   });
 }
 const mean = a => a.reduce((p, q) => p + q, 0) / a.length;
+const round = v => Math.round(v * 1000) / 1000;
 
-// Test recordings are named <spell>__<speaker>.wav. tests/audio holds
-// text-to-speech voices; tests/real holds recordings of real people.
-function scoreSet(dir, label) {
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.wav')).sort();
-  const right = [], wrong = [], rows = [], misses = [];
-  let correctTop = 0;
-  console.log('\n' + label + ': rho of each test recording against each spell');
-  console.log('file'.padEnd(36) + spells.map(s => s.padStart(15)).join(''));
-  for (const f of files) {
-    const truth = f.split('__')[0];
+function loadSet(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter(f => f.endsWith('.wav')).sort().map(f => {
     const w = readWav(path.join(dir, f));
-    const cast = DSP.process(w.x, w.fs);
-    const sc = spells.map(s => DSP.scoreMulti(refs[s], cast).rho);
-    const top = spells[sc.indexOf(Math.max(...sc))];
-    if (top === truth) correctTop++;
-    else misses.push(f + ' scored highest on ' + top);
-    spells.forEach((s, i) => (s === truth ? right : wrong).push(sc[i]));
-    rows.push({ file: f, truth, scores: sc });
-    console.log(f.padEnd(36) + sc.map((v, i) => ((spells[i] === truth ? '*' : ' ') + v.toFixed(3)).padStart(15)).join(''));
-  }
-  console.log('right word: mean ' + mean(right).toFixed(3) + ', min ' + Math.min(...right).toFixed(3));
-  console.log('wrong word: mean ' + mean(wrong).toFixed(3) + ', max ' + Math.max(...wrong).toFixed(3));
-  misses.forEach(m => console.log('  miss: ' + m));
-  return { files, right, wrong, rows, correctTop };
+    return { file: f, truth: f.split('__')[0], w };
+  });
 }
 
-const audioDir = path.join(__dirname, 'audio');
-const tts = scoreSet(audioDir, 'Text-to-speech voices');
+// Score every recording against every spell. Returns the score
+// matrix and, for each spell, the right-word average and lowest score
+// and the wrong-word average (other spells said, scored on this one).
+function scoreSet(set, label) {
+  const rows = [];
+  let top = 0;
+  for (const r of set) {
+    const cast = DSP.process(r.w.x, r.w.fs);
+    const sc = spells.map(s => DSP.scoreMulti(refs[s], cast).rho);
+    if (spells[sc.indexOf(Math.max(...sc))] === r.truth) top++;
+    rows.push({ file: r.file, truth: r.truth, scores: sc.map(round) });
+  }
+  const per = spells.map((s, i) => {
+    const right = rows.filter(r => r.truth === s).map(r => r.scores[i]);
+    const wrong = rows.filter(r => r.truth !== s).map(r => r.scores[i]);
+    return { spell: s, right_mean: round(mean(right)), right_min: round(Math.min(...right)),
+      wrong_mean: round(mean(wrong)) };
+  });
+  const right = rows.map(r => r.scores[spells.indexOf(r.truth)]);
+  const wrong = rows.flatMap(r => r.scores.filter((v, i) => spells[i] !== r.truth));
+  if (label) {
+    console.log('\n' + label + ': rho of each test recording against each spell');
+    console.log('file'.padEnd(36) + spells.map(s => s.padStart(15)).join(''));
+    for (const r of rows) {
+      console.log(r.file.padEnd(36) + r.scores.map((v, i) =>
+        ((spells[i] === r.truth ? '*' : ' ') + v.toFixed(3)).padStart(15)).join(''));
+    }
+    console.log('right word: mean ' + mean(right).toFixed(3) + ', min ' + Math.min(...right).toFixed(3));
+    console.log('wrong word: mean ' + mean(wrong).toFixed(3) + ', max ' + Math.max(...wrong).toFixed(3));
+    console.log('highest score on the spell said: ' + top + '/' + rows.length);
+  }
+  return { rows, per, top, n: rows.length, right: round(mean(right)), wrong: round(mean(wrong)) };
+}
+
+const tts = loadSet(path.join(__dirname, 'audio'));
+const real = loadSet(path.join(__dirname, 'real'));
+const ttsRes = scoreSet(tts, 'Text-to-speech voices');
 // The player picks the spell, so the game never has to guess which
 // word was said. 90% is checked as a sanity test.
-check('Recordings score highest on their own spell (>= 90%)', tts.correctTop >= 0.9 * tts.files.length, tts.correctTop + '/' + tts.files.length);
-check('Right word scores above the fizzle threshold on average', mean(tts.right) > DSP.RHO_FAIL, mean(tts.right).toFixed(3));
-check('Wrong word averages below the right word by > 0.2', mean(tts.right) - mean(tts.wrong) > 0.2, (mean(tts.right) - mean(tts.wrong)).toFixed(3));
-const rows = tts.rows;
-
-const realDir = path.join(__dirname, 'real');
-let real = null;
-if (fs.existsSync(realDir) && fs.readdirSync(realDir).some(f => f.endsWith('.wav'))) {
-  real = scoreSet(realDir, 'Real recordings');
-} else {
-  console.log('\nNo real recordings in tests/real yet');
-}
+check('Recordings score highest on their own spell (>= 90%)', ttsRes.top >= 0.9 * ttsRes.n, ttsRes.top + '/' + ttsRes.n);
+check('Right word scores above the fizzle threshold on average', ttsRes.right > DSP.RHO_FAIL, ttsRes.right.toFixed(3));
+check('Wrong word averages below the right word by > 0.2', ttsRes.right - ttsRes.wrong > 0.2, (ttsRes.right - ttsRes.wrong).toFixed(3));
+const realRes = real.length ? scoreSet(real, 'Real recordings') : null;
+if (!realRes) console.log('\nNo real recordings in tests/real yet');
 
 // ---- 4. Frequency scaling on and off ----
-// Same test recordings, scored with and without trying a = 0.85 to 1.15
 const scaling = {};
-for (const on of [false, true]) {
-  DSP.USE_SCALING = on;
-  const r = [], wr = [], low = [], high = [];
-  for (const f of tts.files) {
-    const truth = f.split('__')[0];
-    const w = readWav(path.join(audioDir, f));
-    const cast = DSP.process(w.x, w.fs);
-    for (const s of spells) {
-      const rho = DSP.scoreMulti(refs[s], cast).rho;
-      if (s !== truth) { wr.push(rho); continue; }
-      r.push(rho);
-      if (f.includes('low')) low.push(rho);
-      if (f.includes('high')) high.push(rho);
-    }
+for (const [key, set] of [['tts', tts], ['real', real]]) {
+  if (!set.length) continue;
+  scaling[key] = {};
+  for (const on of [false, true]) {
+    DSP.USE_SCALING = on;
+    const r = scoreSet(set);
+    scaling[key][on ? 'on' : 'off'] = { right: r.right, wrong: r.wrong, top: r.top, n: r.n };
   }
-  scaling[on ? 'on' : 'off'] = { right: mean(r), wrong: mean(wr), low: mean(low), high: mean(high) };
 }
 DSP.USE_SCALING = true;
-console.log('\nFrequency scaling (mean rho):      off     on');
-for (const k of ['right', 'wrong', 'low', 'high']) {
-  console.log('  ' + (k === 'low' ? 'right word, low voice' : k === 'high' ? 'right word, high voice' : k + ' word').padEnd(30)
-    + scaling.off[k].toFixed(3).padStart(7) + scaling.on[k].toFixed(3).padStart(7));
+console.log('\nFrequency scaling (mean rho):    right off  right on  wrong off  wrong on');
+for (const k of Object.keys(scaling)) {
+  const v = scaling[k];
+  console.log('  ' + (k === 'tts' ? 'text-to-speech' : 'real').padEnd(30)
+    + [v.off.right, v.on.right, v.off.wrong, v.on.wrong].map(x => x.toFixed(3).padStart(10)).join(''));
 }
 
 // ---- 5. Noise ----
@@ -174,24 +181,40 @@ function addNoise(x, snrDb, seed) {
   }
   return y;
 }
-console.log('\nNoise test (held-out flite kal voice, rho for the right spell):');
-const noise = [];
-for (const snr of [30, 20, 10, 5]) {
-  const vals = [];
-  for (const s of spells) {
-    const w = readWav(path.join(audioDir, s + '__kal.wav'));
-    // Add 0.5 s of silence on each side, so there is noise with no voice
-    const pad = new Float64Array(w.x.length + w.fs);
-    pad.set(w.x, Math.floor(w.fs / 2));
-    vals.push(DSP.scoreMulti(refs[s], DSP.process(addNoise(pad, snr, 7), w.fs)).rho);
+// Each text-to-speech test recording gets 0.5 s of silence on each
+// side, so there is noise with no voice, then random noise at each
+// voice power / noise power. Scored with and without noise removal.
+const SNRS = [40, 30, 20, 15, 10, 5, 0];
+const noise = { snr: SNRS, denoise: [], bandpass: [], wrong: [] };
+console.log('\nNoise test (text-to-speech voices, mean rho):');
+console.log('  SNR (dB)   right, noise removal   right, bandpass only   wrong, noise removal');
+for (const snr of SNRS) {
+  const res = {};
+  for (const on of [true, false]) {
+    DSP.USE_DENOISE = on;
+    const right = [], wrong = [];
+    for (const r of tts) {
+      const pad = new Float64Array(r.w.x.length + r.w.fs);
+      pad.set(r.w.x, Math.floor(r.w.fs / 2));
+      const cast = DSP.process(addNoise(pad, snr, 7), r.w.fs);
+      for (const s of spells) {
+        if (s === r.truth) right.push(DSP.scoreMulti(refs[s], cast).rho);
+        else if (on) wrong.push(DSP.scoreMulti(refs[s], cast).rho);
+      }
+    }
+    res[on] = { right: mean(right), wrong: on ? mean(wrong) : null };
   }
-  noise.push({ snr, mean: mean(vals) });
-  console.log('  SNR ' + String(snr).padStart(2) + ' dB: mean rho ' + mean(vals).toFixed(3));
+  DSP.USE_DENOISE = true;
+  noise.denoise.push(round(res[true].right));
+  noise.bandpass.push(round(res[false].right));
+  noise.wrong.push(round(res[true].wrong));
+  console.log('  ' + String(snr).padStart(8) + res[true].right.toFixed(3).padStart(23)
+    + res[false].right.toFixed(3).padStart(23) + res[true].wrong.toFixed(3).padStart(23));
 }
 
 // ---- 6. Word said twice in one recording ----
 {
-  const w = readWav(path.join(audioDir, 'fireball__esm3fast.wav'));
+  const w = readWav(path.join(__dirname, 'audio', 'fireball__esm3fast.wav'));
   const gap = Math.floor(0.6 * w.fs), y = new Float64Array(gap * 3 + w.x.length * 2);
   y.set(w.x, gap); y.set(w.x.map(v => 0.8 * v), gap * 2 + w.x.length);
   const once = DSP.scoreMulti(refs.fireball, DSP.process(w.x, w.fs)).rho;
@@ -200,6 +223,16 @@ for (const snr of [30, 20, 10, 5]) {
     'once ' + once.toFixed(3) + ', twice ' + twice.toFixed(3));
 }
 
-fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({ spells, rows, noise, scaling, real: real && real.rows }, null, 1));
+// Numbers for the README figures (read by report_figures.m)
+const results = {
+  spells, names: spells.map(s => names[s] || s),
+  tts: { per: ttsRes.per, right: ttsRes.right, wrong: ttsRes.wrong, top: ttsRes.top, n: ttsRes.n,
+    speakers: [...new Set(tts.map(r => r.file.split('__')[1].replace('.wav', '')))].length },
+  real: realRes && { per: realRes.per, right: realRes.right, wrong: realRes.wrong, top: realRes.top, n: realRes.n,
+    speakers: [...new Set(real.map(r => r.file.split('__')[1].replace(/\d*\.wav$/, '')))].length },
+  scaling, noise,
+  rows: { tts: ttsRes.rows, real: realRes ? realRes.rows : [] }
+};
+fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(results, null, 1));
 console.log(fails ? '\n' + fails + ' check(s) failed' : '\nAll checks passed');
 process.exit(fails ? 1 : 0);
