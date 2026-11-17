@@ -182,14 +182,24 @@
     }
     ctx.restore();
     // Puddle that grows as the sprite sinks
+    // Drawn on the same pixel grid as the sprite, with an outline
     if (sink > 0) {
-      const cx = ox + W * px / 2, rx = W * px * (0.12 + 0.42 * sink), ry = px * (1 + 1.6 * sink);
-      ctx.fillStyle = '#1f8197';
-      ctx.beginPath(); ctx.ellipse(cx, base, rx, ry, 0, 0, 2 * Math.PI); ctx.fill();
-      ctx.fillStyle = '#5fdcff';
-      ctx.beginPath(); ctx.ellipse(cx, base - ry * 0.2, rx * 0.8, ry * 0.6, 0, 0, 2 * Math.PI); ctx.fill();
-      ctx.fillStyle = 'rgba(227,251,255,0.8)';
-      ctx.fillRect(Math.round(cx - rx * 0.4), Math.round(base - ry * 0.5), Math.round(rx * 0.25), Math.max(2, px / 2));
+      const cx = ox + (W / 2) * px;
+      const rx = W * (0.12 + 0.42 * sink), ry = 1 + 1.6 * sink;   // in grid pixels
+      const inside = (gx, gy) => ((gx + 0.5) / rx) ** 2 + ((gy + 0.5) / ry) ** 2 <= 1;
+      const nx = Math.ceil(rx) + 1, ny = Math.ceil(ry) + 1;
+      // Raise the puddle so its bottom edge stays on the canvas
+      const py0 = base - (Math.ceil(ry) - 1) * px;
+      for (let gy = -ny; gy <= ny; gy++) for (let gx = -nx; gx <= nx; gx++) {
+        let c = null;
+        if (inside(gx, gy)) {
+          c = gy < -ry * 0.35 ? '#5fdcff' : gy < ry * 0.3 ? '#2aa6d6' : '#1f8197';
+          if (gy === Math.floor(-ry * 0.5) && gx > -rx * 0.55 && gx < -rx * 0.2) c = '#e3fbff';
+        } else if (inside(gx + 1, gy) || inside(gx - 1, gy) || inside(gx, gy + 1) || inside(gx, gy - 1)) {
+          c = '#120e24';
+        }
+        if (c) { ctx.fillStyle = c; ctx.fillRect(cx + gx * px, py0 + gy * px, px, px); }
+      }
     }
     if (opts.tint) {
       ctx.globalCompositeOperation = 'source-atop';

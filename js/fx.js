@@ -244,12 +244,14 @@
             ctx.lineTo(x, crest);
           }
           ctx.lineTo(front, H); ctx.closePath(); ctx.fill();
-          // Foam along the top
-          ctx.fillStyle = '#ffffff';
-          for (let x = 0; x <= front; x += 14) {
+          // Light line along the crest of the wave
+          ctx.strokeStyle = '#c9f7ff'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+          ctx.beginPath();
+          for (let x = 0; x <= front; x += 8) {
             const crest = top + 18 * Math.sin(x / 40 + e.age * 6) + (front - x < 70 ? -(70 - (front - x)) * 0.5 : 0);
-            ctx.fillRect(Math.round(x), Math.round(crest - 3), 6, 4);
+            if (x === 0) ctx.moveTo(x, crest); else ctx.lineTo(x, crest);
           }
+          ctx.stroke();
           ctx.globalAlpha = 1;
           if (front >= to.x && !e.done) {
             e.done = true;

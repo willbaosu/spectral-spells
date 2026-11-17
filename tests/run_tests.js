@@ -2,8 +2,10 @@
 // 1. FFT matches the DFT sum computed directly (N^2 way)
 // 2. Bandpass keeps a tone inside 80 Hz to 7 kHz, removes tones outside
 // 3. Test recordings score highest on the spell that was said
-// 4. Scores as background noise gets louder
-// 5. Saying the word twice scores the same as saying it once
+// 4. Scores with and without frequency scaling
+// 5. Scores as background noise gets louder
+// 6. Saying the word twice scores the same as saying it once
+// Real recordings in tests/real are scored too, if there are any
 const fs = require('fs');
 const path = require('path');
 const DSP = require('../js/dsp.js');
@@ -75,46 +77,90 @@ function check(name, ok, info) {
 }
 
 // ---- 3. Score matrix: each test recording vs each spell ----
+// Reference recordings are listed in spells/references.json
 const spellDir = path.join(__dirname, '..', 'spells');
-const spells = fs.readdirSync(spellDir).filter(d => fs.statSync(path.join(spellDir, d)).isDirectory()).sort();
+const list = JSON.parse(fs.readFileSync(path.join(spellDir, 'references.json'), 'utf8'));
+const spells = Object.keys(list).sort();
 const refs = {};
 for (const s of spells) {
-  refs[s] = fs.readdirSync(path.join(spellDir, s)).filter(f => f.endsWith('.wav')).map(f => {
-    const w = readWav(path.join(spellDir, s, f));
+  refs[s] = list[s].map(r => {
+    const w = readWav(path.join(spellDir, s, r.file));
     return DSP.process(w.x, w.fs).feat;
   });
 }
-const audioDir = path.join(__dirname, 'audio');
-const files = fs.readdirSync(audioDir).filter(f => f.endsWith('.wav')).sort();
-const right = [], wrong = [];
-console.log('\nScores (rho) of each test recording against each spell:');
-console.log('file'.padEnd(36) + spells.map(s => s.padStart(13)).join(''));
-let correctTop = 0;
-const misses = [];
-const rows = [];
-for (const f of files) {
-  const truth = f.split('__')[0];
-  const w = readWav(path.join(audioDir, f));
-  const cast = DSP.process(w.x, w.fs).feat;
-  const sc = spells.map(s => DSP.scoreMulti(refs[s], cast).rho);
-  const top = spells[sc.indexOf(Math.max(...sc))];
-  if (top === truth) correctTop++;
-  else misses.push(f + ' scored highest on ' + top);
-  spells.forEach((s, i) => (s === truth ? right : wrong).push(sc[i]));
-  rows.push({ file: f, truth, scores: sc });
-  console.log(f.padEnd(36) + sc.map((v, i) => ((spells[i] === truth ? '*' : ' ') + v.toFixed(3)).padStart(13)).join(''));
-}
 const mean = a => a.reduce((p, q) => p + q, 0) / a.length;
-console.log('\nright word: mean ' + mean(right).toFixed(3) + ', min ' + Math.min(...right).toFixed(3));
-console.log('wrong word: mean ' + mean(wrong).toFixed(3) + ', max ' + Math.max(...wrong).toFixed(3));
-misses.forEach(m => console.log('  miss: ' + m));
+
+// Test recordings are named <spell>__<speaker>.wav. tests/audio holds
+// text-to-speech voices; tests/real holds recordings of real people.
+function scoreSet(dir, label) {
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.wav')).sort();
+  const right = [], wrong = [], rows = [], misses = [];
+  let correctTop = 0;
+  console.log('\n' + label + ': rho of each test recording against each spell');
+  console.log('file'.padEnd(36) + spells.map(s => s.padStart(15)).join(''));
+  for (const f of files) {
+    const truth = f.split('__')[0];
+    const w = readWav(path.join(dir, f));
+    const cast = DSP.process(w.x, w.fs);
+    const sc = spells.map(s => DSP.scoreMulti(refs[s], cast).rho);
+    const top = spells[sc.indexOf(Math.max(...sc))];
+    if (top === truth) correctTop++;
+    else misses.push(f + ' scored highest on ' + top);
+    spells.forEach((s, i) => (s === truth ? right : wrong).push(sc[i]));
+    rows.push({ file: f, truth, scores: sc });
+    console.log(f.padEnd(36) + sc.map((v, i) => ((spells[i] === truth ? '*' : ' ') + v.toFixed(3)).padStart(15)).join(''));
+  }
+  console.log('right word: mean ' + mean(right).toFixed(3) + ', min ' + Math.min(...right).toFixed(3));
+  console.log('wrong word: mean ' + mean(wrong).toFixed(3) + ', max ' + Math.max(...wrong).toFixed(3));
+  misses.forEach(m => console.log('  miss: ' + m));
+  return { files, right, wrong, rows, correctTop };
+}
+
+const audioDir = path.join(__dirname, 'audio');
+const tts = scoreSet(audioDir, 'Text-to-speech voices');
 // The player picks the spell, so the game never has to guess which
 // word was said. 90% is checked as a sanity test.
-check('Recordings score highest on their own spell (>= 90%)', correctTop >= 0.9 * files.length, correctTop + '/' + files.length);
-check('Right word scores above the fizzle threshold on average', mean(right) > DSP.RHO_FAIL, mean(right).toFixed(3));
-check('Wrong word averages below the right word by > 0.2', mean(right) - mean(wrong) > 0.2, (mean(right) - mean(wrong)).toFixed(3));
+check('Recordings score highest on their own spell (>= 90%)', tts.correctTop >= 0.9 * tts.files.length, tts.correctTop + '/' + tts.files.length);
+check('Right word scores above the fizzle threshold on average', mean(tts.right) > DSP.RHO_FAIL, mean(tts.right).toFixed(3));
+check('Wrong word averages below the right word by > 0.2', mean(tts.right) - mean(tts.wrong) > 0.2, (mean(tts.right) - mean(tts.wrong)).toFixed(3));
+const rows = tts.rows;
 
-// ---- 4. Noise ----
+const realDir = path.join(__dirname, 'real');
+let real = null;
+if (fs.existsSync(realDir) && fs.readdirSync(realDir).some(f => f.endsWith('.wav'))) {
+  real = scoreSet(realDir, 'Real recordings');
+} else {
+  console.log('\nNo real recordings in tests/real yet');
+}
+
+// ---- 4. Frequency scaling on and off ----
+// Same test recordings, scored with and without trying a = 0.85 to 1.15
+const scaling = {};
+for (const on of [false, true]) {
+  DSP.USE_SCALING = on;
+  const r = [], wr = [], low = [], high = [];
+  for (const f of tts.files) {
+    const truth = f.split('__')[0];
+    const w = readWav(path.join(audioDir, f));
+    const cast = DSP.process(w.x, w.fs);
+    for (const s of spells) {
+      const rho = DSP.scoreMulti(refs[s], cast).rho;
+      if (s !== truth) { wr.push(rho); continue; }
+      r.push(rho);
+      if (f.includes('low')) low.push(rho);
+      if (f.includes('high')) high.push(rho);
+    }
+  }
+  scaling[on ? 'on' : 'off'] = { right: mean(r), wrong: mean(wr), low: mean(low), high: mean(high) };
+}
+DSP.USE_SCALING = true;
+console.log('\nFrequency scaling (mean rho):      off     on');
+for (const k of ['right', 'wrong', 'low', 'high']) {
+  console.log('  ' + (k === 'low' ? 'right word, low voice' : k === 'high' ? 'right word, high voice' : k + ' word').padEnd(30)
+    + scaling.off[k].toFixed(3).padStart(7) + scaling.on[k].toFixed(3).padStart(7));
+}
+
+// ---- 5. Noise ----
 function addNoise(x, snrDb, seed) {
   let s = seed, p = 0;
   for (let i = 0; i < x.length; i++) p += x[i] * x[i];
@@ -137,23 +183,23 @@ for (const snr of [30, 20, 10, 5]) {
     // Add 0.5 s of silence on each side, so there is noise with no voice
     const pad = new Float64Array(w.x.length + w.fs);
     pad.set(w.x, Math.floor(w.fs / 2));
-    vals.push(DSP.scoreMulti(refs[s], DSP.process(addNoise(pad, snr, 7), w.fs).feat).rho);
+    vals.push(DSP.scoreMulti(refs[s], DSP.process(addNoise(pad, snr, 7), w.fs)).rho);
   }
   noise.push({ snr, mean: mean(vals) });
   console.log('  SNR ' + String(snr).padStart(2) + ' dB: mean rho ' + mean(vals).toFixed(3));
 }
 
-// ---- 5. Word said twice in one recording ----
+// ---- 6. Word said twice in one recording ----
 {
   const w = readWav(path.join(audioDir, 'fireball__esm3fast.wav'));
   const gap = Math.floor(0.6 * w.fs), y = new Float64Array(gap * 3 + w.x.length * 2);
   y.set(w.x, gap); y.set(w.x.map(v => 0.8 * v), gap * 2 + w.x.length);
-  const once = DSP.scoreMulti(refs.fireball, DSP.process(w.x, w.fs).feat).rho;
-  const twice = DSP.scoreMulti(refs.fireball, DSP.process(y, w.fs).feat).rho;
+  const once = DSP.scoreMulti(refs.fireball, DSP.process(w.x, w.fs)).rho;
+  const twice = DSP.scoreMulti(refs.fireball, DSP.process(y, w.fs)).rho;
   check('Saying the word twice scores like saying it once', Math.abs(once - twice) < 0.05,
     'once ' + once.toFixed(3) + ', twice ' + twice.toFixed(3));
 }
 
-fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({ spells, rows, noise }, null, 1));
+fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({ spells, rows, noise, scaling, real: real && real.rows }, null, 1));
 console.log(fails ? '\n' + fails + ' check(s) failed' : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

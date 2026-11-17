@@ -27,7 +27,7 @@ Each spell's effect is scaled by its power.
 
 For example, a Fireball said at 50% power does 13 damage, and a Shield at 50% power blocks half of the attack.
 
-**Voice training.** Each time you open the game, it asks you to record each spell. One take per spell is enough to start, and up to three are kept. Each take is added as an extra reference for that spell, so the game compares your voice with your own voice as well as with four computer voices. Takes last for the session. The **Voice training** button lets you add or replace takes during the fight.
+**Voice training.** Each time you open the game, it asks you to record each spell. One take per spell is enough to start, and up to three are kept. Each take is added as an extra reference for that spell, so the game compares your voice with your own voice as well as with the reference recordings. Takes last for the session. The **Voice training** button lets you add or replace takes during the fight.
 
 When Nerith's HP reaches 0, he melts into a puddle. You can then play again or fight a stronger Nerith.
 
@@ -57,11 +57,12 @@ All of the signal processing is in [`js/dsp.js`](js/dsp.js).
 
    *Part c. Short ffts of three recordings: time left to right, frequency bottom to top, brighter is stronger. The horizontal stripes in the reference are the harmonics f, 2f, 3f, ... of the voice. The new voice saying "Fireball" has the same overall shape as the reference. Saying "Focus" does not.*
 
-6. **Correlation.** Your result C is compared with each reference R using normalized correlation, ρ = Σ R·C / √(ΣR² · ΣC²). The game slides your recording up to ±150 ms and stretches it between 80% and 125% to allow for timing. It keeps the highest ρ across all references of the spell: four computer voices plus your training recording.
+6. **Frequency scaling.** A higher voice moves its whole spectrum up, which is close to a frequency scaling F(s/a). The bands are spaced by a fixed ratio, so scaling by a moves the band energies by a fixed number of bands. The game tries a = 0.85, 0.925, 1, 1.075, and 1.15.
+7. **Correlation.** Your result C is compared with each reference R using normalized correlation, ρ = Σ R·C / √(ΣR² · ΣC²). The game slides your recording up to ±150 ms and stretches it between 80% and 125% to allow for timing. It keeps the highest ρ across all frequency scalings and all references of the spell, including your training takes.
 
 ## Test results
 
-**How it was tested.** Each spell has four reference recordings, made with text-to-speech voices. The game compares your voice against these. To check that the game also works on voices it has never heard, 24 test recordings were made with six other text-to-speech voices. Each test voice says all four spells. Every test recording was then scored against every spell.
+**How it was tested.** Each spell currently has four reference recordings, made with text-to-speech voices. The game compares your voice against these. To check that the game also works on voices it has never heard, 24 test recordings were made with six other text-to-speech voices. Each test voice says all four spells. Every test recording was then scored against every spell.
 
 **Does saying the right spell score higher than saying the wrong one?** Each number is a peak ρ.
 
@@ -82,6 +83,8 @@ The test also checked which spell each recording matched best. In all 24 recordi
 
 *Part d. The numbers from the table above. Blue bars should be above the red line and orange bars below it.*
 
+The table and figure above were measured before frequency scaling was added.
+
 **Does it work with background noise?** Random noise was added to the test recordings. The table shows the average peak ρ for the right word.
 
 | Voice power / noise power | 40 dB | 20 dB | 10 dB | 5 dB | 0 dB |
@@ -95,7 +98,20 @@ At 0 dB the noise is as strong as the voice. Noise removal keeps the right word 
 
 *Part e. The same results as a plot, with the wrong-word score added.*
 
-**Limitation and voice training.** All of the test voices are text-to-speech. A real voice scored much lower against the computer-voice references (ρ = 0.27 to 0.47 in a first try), so every spell fizzled. That is why the game asks you to record each spell. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
+**Frequency scaling.** The same 24 test recordings, scored with and without frequency scaling. Each number is the average peak ρ.
+
+| | Without scaling | With scaling |
+|:--|:--|:--|
+| Right word | 0.79 | 0.82 |
+| Wrong word | 0.47 | 0.50 |
+| Right word, low voice (one voice) | 0.85 | 0.88 |
+| Right word, high voice (one voice) | 0.74 | 0.77 |
+
+On these voices, scaling raises the right-word and wrong-word scores by about the same amount, so the gap between them stays at 0.32. One recording (a high voice saying "Lightning Bolt") now scores slightly higher on Shield. The text-to-speech voices may not differ enough in frequency range for scaling to help. Real recordings will show whether it does.
+
+**Limitation and voice training.** All of the test voices so far are text-to-speech. A real voice scored much lower against the text-to-speech references (ρ = 0.27 to 0.47 in a first try), so every spell fizzled. That is why the game asks you to record each spell. In a simulation where three test voices recorded their own training takes and then cast at a different speed and pitch, training raised the right-word score from 0.81 to 0.94 on average, while wrong words stayed at 0.45.
+
+**Next: real recordings.** Several people will record each spell a few times. Some of these recordings will be added as references, and the rest will be used as test recordings.
 
 The figures were made with [`report_figures.m`](report_figures.m) in MATLAB. To rerun the tests: `node tests/run_tests.js`. It also checks that the FFT matches the DFT computed directly and that the bandpass keeps a 1 kHz tone while removing 30 Hz and 7.5 kHz tones.
 
@@ -106,6 +122,13 @@ The page loads its recordings with `fetch`, so it has to be served from a web se
 **GitHub Pages:** Settings → Pages → Deploy from a branch → `main`, `/ (root)` → Save. Browsers only allow the microphone on HTTPS pages, which GitHub Pages provides.
 
 **On your computer:** run `python3 -m http.server 8000` in this folder and open `http://localhost:8000`.
+
+## Adding recordings
+
+Recordings should be mono, 16-bit .wav files.
+
+- **References:** put the file in `spells/<spell>/` and add it to that spell's list in `spells/references.json`, with a short label. The first file in each list is the one **Hear it** plays.
+- **Test recordings:** put the file in `tests/real/`, named `<spell>__<speaker>.wav`, for example `focus__will1.wav`. The tests score these separately from the text-to-speech voices.
 
 ## Files
 
@@ -118,13 +141,15 @@ js/sprites.js            pixel-art sprites
 js/fx.js                 spell animations
 js/charts.js             plots of your last cast
 report_figures.m         MATLAB script for the README figures
-spells/<spell>/*.wav     reference recordings, four voices per spell
+spells/<spell>/*.wav     reference recordings
+spells/references.json   list of reference recordings for each spell
 enemy/*.wav              Nerith's spell lines
 tests/run_tests.js       tests
-tests/audio/*.wav        test recordings
+tests/audio/*.wav        text-to-speech test recordings
+tests/real/*.wav         real test recordings
 docs/                    screenshot and figures
 ```
 
 ## Credits
 
-The recordings were made with the Flite and eSpeak NG text-to-speech programs.
+The text-to-speech recordings were made with the Flite and eSpeak NG programs.

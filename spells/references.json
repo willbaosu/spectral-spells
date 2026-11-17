@@ -1,0 +1,74 @@
+{
+  "fireball": [
+    {
+      "file": "slt.wav",
+      "label": "text-to-speech voice 1"
+    },
+    {
+      "file": "awb.wav",
+      "label": "text-to-speech voice 2"
+    },
+    {
+      "file": "esus.wav",
+      "label": "text-to-speech voice 3"
+    },
+    {
+      "file": "esf3.wav",
+      "label": "text-to-speech voice 4"
+    }
+  ],
+  "lightning_bolt": [
+    {
+      "file": "slt.wav",
+      "label": "text-to-speech voice 1"
+    },
+    {
+      "file": "awb.wav",
+      "label": "text-to-speech voice 2"
+    },
+    {
+      "file": "esus.wav",
+      "label": "text-to-speech voice 3"
+    },
+    {
+      "file": "esf3.wav",
+      "label": "text-to-speech voice 4"
+    }
+  ],
+  "focus": [
+    {
+      "file": "slt.wav",
+      "label": "text-to-speech voice 1"
+    },
+    {
+      "file": "awb.wav",
+      "label": "text-to-speech voice 2"
+    },
+    {
+      "file": "esus.wav",
+      "label": "text-to-speech voice 3"
+    },
+    {
+      "file": "esf3.wav",
+      "label": "text-to-speech voice 4"
+    }
+  ],
+  "shield": [
+    {
+      "file": "slt.wav",
+      "label": "text-to-speech voice 1"
+    },
+    {
+      "file": "awb.wav",
+      "label": "text-to-speech voice 2"
+    },
+    {
+      "file": "esus.wav",
+      "label": "text-to-speech voice 3"
+    },
+    {
+      "file": "esf3.wav",
+      "label": "text-to-speech voice 4"
+    }
+  ]
+}

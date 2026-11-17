@@ -278,8 +278,33 @@
       }
       feat.push(bands);
     }
-    const cep = DSP.removeMean(DSP.cepstrum(feat, DSP.N_CEP));
-    return { feat: cep, bands: feat, spec, frames: nF, binHz: fs / N };
+    // Coefficients at each frequency scaling a (a = 1 is unscaled)
+    const scaled = DSP.SCALES.map(a => ({
+      a, feat: DSP.removeMean(DSP.cepstrum(DSP.scaleBands(feat, a), DSP.N_CEP))
+    }));
+    const cep = scaled.find(v => v.a === 1).feat;
+    return { feat: cep, scaled, bands: feat, spec, frames: nF, binHz: fs / N };
+  };
+
+  // Frequency scaling F(s/a): a higher voice has its whole spectrum
+  // moved up by a factor a. The bands are spaced by a fixed ratio, so
+  // scaling by a moves each piece's band energies by log(a)/log(ratio)
+  // bands. Values between bands come from linear interpolation.
+  DSP.SCALES = [0.85, 0.925, 1, 1.075, 1.15];
+  DSP.scaleBands = function (bands, a) {
+    if (a === 1) return bands;
+    const B = DSP.N_BANDS;
+    const ratio = Math.pow(DSP.F_HIGH / Math.max(DSP.F_LOW, 100), 1 / B);
+    const d = Math.log(a) / Math.log(ratio);
+    return bands.map(row => {
+      const out = new Float64Array(B);
+      for (let b = 0; b < B; b++) {
+        const t = Math.min(B - 1, Math.max(0, b + d));
+        const b0 = Math.floor(t), w = t - b0, b1 = Math.min(b0 + 1, B - 1);
+        out[b] = row[b0] * (1 - w) + row[b1] * w;
+      }
+      return out;
+    });
   };
 
   // Inner product of each piece's log band energies with cosines,
@@ -368,15 +393,22 @@
     return best;
   };
 
-  // Best peak rho over the four reference voices
-  DSP.scoreMulti = function (refFeats, castFeat) {
+  // Best peak rho over every reference recording and every frequency
+  // scaling of the cast. cast is the output of DSP.process, or a plain
+  // list of coefficients (then only a = 1 is tried).
+  DSP.scoreMulti = function (refFeats, cast) {
+    const list = Array.isArray(cast) ? [{ a: 1, feat: cast }]
+      : DSP.USE_SCALING ? cast.scaled : [{ a: 1, feat: cast.feat }];
     let best = null;
     refFeats.forEach((r, i) => {
-      const s = DSP.score(r, castFeat);
-      if (!best || s.rho > best.rho) { best = s; best.ref = i; }
+      for (const v of list) {
+        const s = DSP.score(r, v.feat);
+        if (!best || s.rho > best.rho) { best = s; best.ref = i; best.scale = v.a; }
+      }
     });
     return best;
   };
+  DSP.USE_SCALING = true;
 
   // Spell power 0 to 1: 0 below RHO_FAIL, 1 at RHO_FULL, linear between.
   // In tests the right word averaged 0.77 and a wrong word 0.46.
@@ -401,7 +433,7 @@
     return {
       raw: samples, filtered: x, fsIn: fs,
       spectrumBefore: bp.before, spectrumAfter: bp.after,
-      feat: F.feat, spec: F.spec, binHz: F.binHz,
+      feat: F.feat, scaled: F.scaled, spec: F.spec, binHz: F.binHz,
       duration: x.length / DSP.FS
     };
   };

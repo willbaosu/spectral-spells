@@ -21,8 +21,6 @@
     healing_rain: { name: 'Healing Rain', heal: 18 },
     bubble_barrier: { name: 'Bubble Barrier' }
   };
-  const VOICES = ['slt', 'awb', 'esus', 'esf3'];   // reference voices per spell
-  const PLAY_VOICE = 'slt';                         // the one players hear
   const RECORD_SEC = 3;
   const PLAYER_MAX = 100;
   const FOCUS_TURNS = 3, FOCUS_MAX = 0.6;
@@ -53,7 +51,10 @@
     while (p + 8 <= v.byteLength) {
       const id = String.fromCharCode(v.getUint8(p), v.getUint8(p + 1), v.getUint8(p + 2), v.getUint8(p + 3));
       const size = v.getUint32(p + 4, true);
-      if (id === 'fmt ') { ch = v.getUint16(p + 10, true); fs = v.getUint32(p + 12, true); }
+      if (id === 'fmt ') {
+        ch = v.getUint16(p + 10, true); fs = v.getUint32(p + 12, true);
+        if (v.getUint16(p + 22, true) !== 16) throw new Error('reference .wav files must be 16-bit');
+      }
       if (id === 'data') data = { off: p + 8, size };
       p += 8 + size + (size % 2);
     }
@@ -62,18 +63,24 @@
     return { x, fs };
   }
 
+  // The reference recordings for each spell are listed in
+  // spells/references.json. The first one is what "Hear it" plays.
   async function loadSpells() {
+    const listRes = await fetch('spells/references.json');
+    if (!listRes.ok) throw new Error('could not load spells/references.json');
+    const list = await listRes.json();
     for (const s of SPELLS) {
       state.refs[s.id] = [];
-      for (const voice of VOICES) {
-        const url = `spells/${s.id}/${voice}.wav`;
+      for (const ref of list[s.id] || []) {
+        const url = `spells/${s.id}/${ref.file}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('could not load ' + url);
         const w = parseWav(await res.arrayBuffer());
         const proc = DSP.process(w.x, w.fs);
-        proc.voice = voice;
+        proc.voice = 'ref';
+        proc.label = ref.label || ref.file;
         state.refs[s.id].push(proc);
-        if (voice === PLAY_VOICE) state.refAudio[s.id] = w;
+        if (!state.refAudio[s.id]) state.refAudio[s.id] = w;
       }
     }
   }
@@ -255,7 +262,7 @@
   // ---------- Your turn ----------
 
   function scoreCast(proc, s) {
-    const sc = DSP.scoreMulti(state.refs[s.id].map(r => r.feat), proc.feat);
+    const sc = DSP.scoreMulti(state.refs[s.id].map(r => r.feat), proc);
     const eff = DSP.effectiveness(sc.rho);
     state.casts++;
     state.bestRho = Math.max(state.bestRho, sc.rho);
@@ -409,7 +416,7 @@
   // At the start of each session you record each spell one to three
   // times. Each take is added as an extra reference for that spell, so
   // the game compares your voice with your own voice as well as the
-  // computer voices. Takes last until the page is closed or reloaded.
+  // reference recordings. Takes last until the page is closed or reloaded.
   const MAX_TAKES = 3;
   const yours = id => state.refs[id].filter(r => r.voice === 'you');
 
@@ -450,7 +457,7 @@
       row.querySelectorAll('button').forEach(b => (b.disabled = state.busy));
     });
     $('trainDoneBtn').disabled = state.busy;
-    $('trainDoneBtn').textContent = n === 0 ? 'Skip (use computer voices only)'
+    $('trainDoneBtn').textContent = n === 0 ? 'Skip (use the reference recordings only)'
       : state.fightStarted ? 'Back to the fight' : `Start the fight (${n} of 4 trained)`;
   }
 
@@ -465,11 +472,11 @@
       if (!heard(audio, proc)) {
         st.textContent = 'Nothing was heard. Try again closer to the mic.';
       } else {
-        const computer = state.refs[id].filter(r => r.voice !== 'you').map(r => r.feat);
-        const rho = DSP.scoreMulti(computer, proc.feat).rho;
+        const given = state.refs[id].filter(r => r.voice !== 'you').map(r => r.feat);
+        const rho = DSP.scoreMulti(given, proc).rho;
         addYourRef(id, Float64Array.from(proc.filtered));
         const k = yours(id).length;
-        st.textContent = `✓ Take ${k} of ${MAX_TAKES} saved. Match with the computer voices: ρ = ${rho.toFixed(2)}`;
+        st.textContent = `✓ Take ${k} of ${MAX_TAKES} saved. Match with the reference recordings: ρ = ${rho.toFixed(2)}`;
       }
     } catch (err) {
       st.textContent = 'Microphone error: ' + err.message;
@@ -525,7 +532,7 @@
     const frameSec = DSP.HOP / DSP.FS;
     Charts.spectrogram($('chartCast'), proc.spec, proc.binHz, frameSec, 'Your cast');
     const ref = state.refs[s.id][sc.ref];
-    const who = ref.voice === 'you' ? 'your training take' : `computer voice ${sc.ref + 1}`;
+    const who = ref.voice === 'you' ? 'your training take' : ref.label;
     Charts.spectrogram($('chartRef'), ref.spec, ref.binHz, frameSec, `Closest reference: ${who}`);
   }
 
