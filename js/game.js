@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  // kind: 'attack' spells are cast on your turn; 'reaction' spells are
+  // kind: 'attack' spells are cast on your turn. 'reaction' spells are
   // cast while the boss's spell is incoming.
   const SPELLS = [
     { id: 'fireball', name: 'Fireball', kind: 'attack', base: 26, color: '#ff8a4c',
@@ -553,8 +553,8 @@
     });
   }
 
-  // win = true shows Play again and Fight a stronger Nerith;
-  // win = false shows Try again
+  // win = true shows Play again and Fight a stronger Nerith.
+  // win = false shows Try again.
   function showBanner(title, text, win) {
     $('bannerTitle').textContent = title;
     $('bannerText').textContent = text;

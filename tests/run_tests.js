@@ -5,10 +5,9 @@
 // 4. Scores with and without frequency scaling
 // 5. Scores as background noise gets louder
 // 6. Saying the word twice scores the same as saying it once
-// Test recordings: tests/audio (text-to-speech voices) and tests/real
-// (real people), named <spell>__<speaker>.wav.
-// The numbers for the README figures are saved to tests/results.json,
-// which report_figures.m reads.
+// Test recordings are in tests/audio (text-to-speech) and tests/real
+// (real voices), named <spell>__<speaker>.wav. The results are saved
+// to tests/results.json for report_figures.m.
 const fs = require('fs');
 const path = require('path');
 const DSP = require('../js/dsp.js');
@@ -103,9 +102,8 @@ function loadSet(dir) {
   });
 }
 
-// Score every recording against every spell. Returns the score
-// matrix and, for each spell, the right-word average and lowest score
-// and the wrong-word average (other spells said, scored on this one).
+// Score each recording against each spell, and average the scores
+// for the right word and the wrong words
 function scoreSet(set, label) {
   const rows = [];
   let top = 0;
@@ -140,8 +138,7 @@ function scoreSet(set, label) {
 const tts = loadSet(path.join(__dirname, 'audio'));
 const real = loadSet(path.join(__dirname, 'real'));
 const ttsRes = scoreSet(tts, 'Text-to-speech voices');
-// The player picks the spell, so the game never has to guess which
-// word was said. 90% is checked as a sanity test.
+// At least 90% should score highest on the spell that was said
 check('Recordings score highest on their own spell (>= 90%)', ttsRes.top >= 0.9 * ttsRes.n, ttsRes.top + '/' + ttsRes.n);
 check('Right word scores above the fizzle threshold on average', ttsRes.right > DSP.RHO_FAIL, ttsRes.right.toFixed(3));
 check('Wrong word averages below the right word by > 0.2', ttsRes.right - ttsRes.wrong > 0.2, (ttsRes.right - ttsRes.wrong).toFixed(3));
@@ -181,9 +178,8 @@ function addNoise(x, snrDb, seed) {
   }
   return y;
 }
-// Each text-to-speech test recording gets 0.5 s of silence on each
-// side, so there is noise with no voice, then random noise at each
-// voice power / noise power. Scored with and without noise removal.
+// Add 0.5 s of silence on each side, then random noise. Score with
+// and without noise removal.
 const SNRS = [40, 30, 20, 15, 10, 5, 0];
 const noise = { snr: SNRS, denoise: [], bandpass: [], wrong: [] };
 console.log('\nNoise test (text-to-speech voices, mean rho):');

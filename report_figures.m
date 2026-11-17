@@ -112,12 +112,11 @@ for i = 1:3
 end
 colormap(hot);
 
-% Run the tests (needs Node.js). They score every test
-% recording and save the numbers to tests/results.json.
+% Run the tests with Node.js, which saves tests/results.json
 nodeCmd = 'node';
 [st, ~] = system('node --version');
 if st ~= 0
-    % MATLAB on a Mac may not see node; try where it installs
+    % Look for node where it is usually installed
     places = {'/usr/local/bin/node', '/opt/homebrew/bin/node'};
     nodeCmd = '';
     for i = 1:numel(places)
@@ -133,7 +132,7 @@ disp('Running the tests (about 15 s)...');
 [st, out] = system([nodeCmd ' tests/run_tests.js']);
 disp(out);
 if st ~= 0
-    warning('Some test checks failed; see the output above.');
+    warning('Some tests failed. See the output above.');
 end
 r = jsondecode(fileread('tests/results.json'));
 spells = r.names;
@@ -177,6 +176,7 @@ plot([0 40], [0.5 0.5], 'r--', 'LineWidth', 1.5);
 set(gca, 'XDir', 'reverse');
 xlabel('Voice power / noise power (dB)');
 ylabel('Average peak \rho');
+ylim([0.25 0.85]);
 legend('Right word, noise removal', ...
     'Right word, bandpass only', 'Wrong word', ...
     'Fizzle below', 'Location', 'southwest');

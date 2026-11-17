@@ -163,7 +163,7 @@
     }
   }
 
-  // Shield: a curved barrier in front of you; stronger = brighter
+  // Shield: a curved barrier in front of you, brighter when stronger
   FX.shield = function (at, frac) {
     add({
       life: 0.8, draw(e) {

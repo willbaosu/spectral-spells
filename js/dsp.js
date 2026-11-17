@@ -129,7 +129,7 @@
   // ---------- Noise removal ----------
 
   // Cut the signal into short pieces and fft each one. The quietest
-  // 10% of pieces are taken as background noise; their average |S|^2
+  // 10% of pieces are taken as background noise. Their average |S|^2
   // at each frequency is the noise level. Each piece is multiplied by
   //   G(f) = max(1 - ALPHA · noise(f) / |S(f)|^2, FLOOR)
   // (near 1 where the voice is much louder than the noise, near 0
@@ -177,8 +177,8 @@
 
   // ---------- Find the word ----------
 
-  // Energy ∫|x|^2 dt of each 20 ms piece; keep the loudest stretch of
-  // speech, plus 40 ms on each side
+  // Energy ∫|x|^2 dt of each 20 ms piece. Keep the loudest stretch of
+  // speech, plus 40 ms on each side.
   DSP.trimSilence = function (x, fs) {
     const L = Math.round(0.02 * fs);
     const nF = Math.floor(x.length / L);
@@ -352,8 +352,8 @@
 
   // Correlation at one shift, divided by the energies:
   //   rho(lag) = Σ A[t+lag] B[t] / sqrt(Σ A^2 · Σ B^2)
-  // over the pieces that overlap. rho = 1 means the same shape;
-  // speaking louder or softer does not change it.
+  // over the pieces that overlap. rho = 1 means the same shape.
+  // Speaking louder or softer does not change it.
   DSP.normCorr = function (A, Bm, lag) {
     let ab = 0, aa = 0, bb = 0, n = 0;
     for (let t = 0; t < Bm.length; t++) {
@@ -370,7 +370,7 @@
   };
 
   // Slide like a correlation: try every shift up to ±150 ms and
-  // stretches from 80% to 125%; the score is the peak rho
+  // stretches from 80% to 125%. The score is the peak rho.
   DSP.STRETCHES = [0.8, 0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15, 1.2, 1.25];
   DSP.MAX_LAG = 15;  // frames
 
@@ -393,9 +393,7 @@
     return best;
   };
 
-  // Best peak rho over every reference recording and every frequency
-  // scaling of the cast. cast is the output of DSP.process, or a plain
-  // list of coefficients (then only a = 1 is tried).
+  // Best peak rho over all references and frequency scalings
   DSP.scoreMulti = function (refFeats, cast) {
     const list = Array.isArray(cast) ? [{ a: 1, feat: cast }]
       : DSP.USE_SCALING ? cast.scaled : [{ a: 1, feat: cast.feat }];
