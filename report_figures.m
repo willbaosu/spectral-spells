@@ -112,7 +112,29 @@ for i = 1:3
 end
 colormap(hot);
 
-% Test results, saved by node tests/run_tests.js
+% Run the tests (needs Node.js). They score every test
+% recording and save the numbers to tests/results.json.
+nodeCmd = 'node';
+[st, ~] = system('node --version');
+if st ~= 0
+    % MATLAB on a Mac may not see node; try where it installs
+    places = {'/usr/local/bin/node', '/opt/homebrew/bin/node'};
+    nodeCmd = '';
+    for i = 1:numel(places)
+        if exist(places{i}, 'file')
+            nodeCmd = places{i};
+        end
+    end
+end
+if isempty(nodeCmd)
+    error('Node.js not found. Install it from nodejs.org.');
+end
+disp('Running the tests (about 15 s)...');
+[st, out] = system([nodeCmd ' tests/run_tests.js']);
+disp(out);
+if st ~= 0
+    warning('Some test checks failed; see the output above.');
+end
 r = jsondecode(fileread('tests/results.json'));
 spells = r.names;
 hasReal = ~isempty(r.real);
