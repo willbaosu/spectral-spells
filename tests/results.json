@@ -48,34 +48,34 @@
   "per": [
    {
     "spell": "fireball",
-    "right_mean": 0.678,
+    "right_mean": 0.713,
     "right_min": 0.603,
-    "wrong_mean": 0.483
+    "wrong_mean": 0.473
    },
    {
     "spell": "focus",
-    "right_mean": 0.849,
+    "right_mean": 0.846,
     "right_min": 0.831,
-    "wrong_mean": 0.534
+    "wrong_mean": 0.509
    },
    {
     "spell": "lightning_bolt",
-    "right_mean": 0.658,
-    "right_min": 0.638,
-    "wrong_mean": 0.409
+    "right_mean": 0.617,
+    "right_min": 0.536,
+    "wrong_mean": 0.399
    },
    {
     "spell": "shield",
-    "right_mean": 0.834,
+    "right_mean": 0.83,
     "right_min": 0.807,
-    "wrong_mean": 0.541
+    "wrong_mean": 0.574
    }
   ],
-  "right": 0.755,
-  "wrong": 0.492,
-  "top": 7,
-  "n": 8,
-  "speakers": 2
+  "right": 0.751,
+  "wrong": 0.489,
+  "top": 10,
+  "n": 12,
+  "speakers": 3
  },
  "scaling": {
   "tts": {
@@ -94,16 +94,16 @@
   },
   "real": {
    "off": {
-    "right": 0.723,
-    "wrong": 0.464,
-    "top": 7,
-    "n": 8
+    "right": 0.726,
+    "wrong": 0.46,
+    "top": 10,
+    "n": 12
    },
    "on": {
-    "right": 0.755,
-    "wrong": 0.492,
-    "top": 7,
-    "n": 8
+    "right": 0.751,
+    "wrong": 0.489,
+    "top": 10,
+    "n": 12
    }
   }
  },
@@ -400,6 +400,16 @@
     ]
    },
    {
+    "file": "fireball__jack.wav",
+    "truth": "fireball",
+    "scores": [
+     0.783,
+     0.549,
+     0.403,
+     0.704
+    ]
+   },
+   {
     "file": "fireball__will.wav",
     "truth": "fireball",
     "scores": [
@@ -417,6 +427,16 @@
      0.831,
      0.32,
      0.476
+    ]
+   },
+   {
+    "file": "focus__jack.wav",
+    "truth": "focus",
+    "scores": [
+     0.383,
+     0.838,
+     0.295,
+     0.545
     ]
    },
    {
@@ -440,6 +460,16 @@
     ]
    },
    {
+    "file": "lightning_bolt__jack.wav",
+    "truth": "lightning_bolt",
+    "scores": [
+     0.472,
+     0.262,
+     0.536,
+     0.667
+    ]
+   },
+   {
     "file": "lightning_bolt__will.wav",
     "truth": "lightning_bolt",
     "scores": [
@@ -457,6 +487,16 @@
      0.578,
      0.455,
      0.807
+    ]
+   },
+   {
+    "file": "shield__jack.wav",
+    "truth": "shield",
+    "scores": [
+     0.499,
+     0.567,
+     0.443,
+     0.822
     ]
    },
    {

@@ -65,22 +65,22 @@ All of the signal processing is in [`js/dsp.js`](js/dsp.js).
 **How it was tested.** Each spell currently has four reference recordings, made with text-to-speech voices. The game compares your voice against these. To check that it also works on voices it has never heard, two sets of test recordings were scored against every spell:
 
 - **Text-to-speech:** six other text-to-speech voices, each saying all four spells (24 recordings).
-- **Real voices:** two people, each saying all four spells once (8 recordings). More speakers and takes will be added.
+- **Real voices:** three people, each saying all four spells once (12 recordings). More speakers and takes will be added.
 
 **Does saying the right spell score higher than saying the wrong one?** Each number is a peak ρ.
 
 | Spell selected | Text-to-speech, right word (average) | Text-to-speech, right word (worst voice) | Text-to-speech, wrong word (average) | Real, right word (average) | Real, wrong word (average) |
 |:--|:--|:--|:--|:--|:--|
-| Fireball | 0.82 | 0.76 | 0.45 | 0.68 | 0.48 |
-| Focus | 0.83 | 0.74 | 0.49 | 0.85 | 0.53 |
-| Lightning Bolt | 0.72 | 0.60 | 0.47 | 0.66 | 0.41 |
-| Shield | 0.90 | 0.83 | 0.57 | 0.83 | 0.54 |
+| Fireball | 0.82 | 0.76 | 0.45 | 0.71 | 0.47 |
+| Focus | 0.83 | 0.74 | 0.49 | 0.85 | 0.51 |
+| Lightning Bolt | 0.72 | 0.60 | 0.47 | 0.62 | 0.40 |
+| Shield | 0.90 | 0.83 | 0.57 | 0.83 | 0.57 |
 
 For example, the Fireball row means: when the six text-to-speech test voices said "Fireball," their recordings averaged ρ = 0.82 against the Fireball references, and the lowest was 0.76. When they said one of the other three spells, the score against Fireball averaged 0.45, which fizzles.
 
-For every spell, the right word scores above 0.5 for both sets. Wrong words average close to 0.5. They are highest for Shield, and for Focus with real voices, so a wrong word there can still cast a weak spell. Lightning Bolt has the lowest right-word scores.
+For every spell, the right word scores above 0.5 for both sets. Wrong words average close to 0.5. They are highest for Shield, so a wrong word there can still cast a weak spell. Lightning Bolt has the lowest right-word scores.
 
-The test also checked which spell each recording matched best. That was the spell actually said in 23 of 24 text-to-speech recordings and 7 of 8 real ones. Both misses were "Lightning Bolt" scoring slightly higher on Shield.
+The test also checked which spell each recording matched best. That was the spell actually said in 23 of 24 text-to-speech recordings and 10 of 12 real ones. All three misses were "Lightning Bolt" scoring higher on Shield.
 
 ![Part d](docs/figures/partD_scores.png)
 
@@ -104,9 +104,9 @@ At 0 dB the noise is as strong as the voice. Noise removal keeps the right word 
 | | Right word, without | Right word, with | Wrong word, without | Wrong word, with |
 |:--|:--|:--|:--|:--|
 | Text-to-speech | 0.79 | 0.82 | 0.47 | 0.50 |
-| Real voices | 0.72 | 0.76 | 0.46 | 0.49 |
+| Real voices | 0.73 | 0.75 | 0.46 | 0.49 |
 
-Scaling raises the right-word and wrong-word scores by about the same amount, so the gap between them barely changes. With only two real speakers so far, it is not yet clear whether scaling helps. More real recordings will show this.
+Scaling raises the right-word and wrong-word scores by about the same amount, so the gap between them barely changes. With only three real speakers so far, it is not yet clear whether scaling helps. More real recordings will show this.
 
 ![Part f](docs/figures/partF_scaling.png)
 
